@@ -1,0 +1,330 @@
+{
+  "default": [
+    {
+      "value": "food",
+      "icon": "food_icon.svg",
+      "children": [
+        {
+          "value": "三餐",
+          "icon": "food_icon.svg"
+        },
+        {
+          "value": "早餐",
+          "icon": "breakfast_icon.svg"
+        },
+        {
+          "value": "中餐",
+          "icon": "food_icon.svg"
+        },
+        {
+          "value": "晚餐",
+          "icon": "food_icon.svg"
+        },
+        {
+          "value": "买菜",
+          "icon": "vegatables_icon.svg"
+        },
+        {
+          "value": "水果",
+          "icon": "fruit_icon.svg"
+        },
+        {
+          "value": "零食",
+          "icon": "snacks_icon.svg"
+        },
+        {
+          "value": "加餐",
+          "icon": "food_icon.svg"
+        },
+        {
+          "value": "下午茶",
+          "icon": "afternoon_tea_icon.svg"
+        },
+        {
+          "value": "烟酒饮品",
+          "icon": "drink_icon.svg"
+        },
+        {
+          "value": "粮油调料",
+          "icon": "food_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "traffic",
+      "icon": "traffic_icon.svg",
+      "children": [
+        {
+          "value": "公交地铁",
+          "icon": "subway_icon.svg"
+        },
+        {
+          "value": "打车",
+          "icon": "taxi_icon.svg"
+        },
+        {
+          "value": "火车飞机",
+          "icon": "plane_train_icon.svg"
+        },
+        {
+          "value": "共享单车",
+          "icon": "traffic_icon.svg"
+        },
+        {
+          "value": "私家车",
+          "icon": "traffic_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "shopping",
+      "icon": "shopping_icon.svg",
+      "children": [
+        {
+          "value": "日用品",
+          "icon": "goods_icon.svg"
+        },
+        {
+          "value": "衣帽鞋包",
+          "icon": "clothes_icon.svg"
+        },
+        {
+          "value": "护肤美妆",
+          "icon": "shopping_icon.svg"
+        },
+        {
+          "value": "饰品",
+          "icon": "shopping_icon.svg"
+        },
+        {
+          "value": "数码",
+          "icon": "digital_icon.svg"
+        },
+        {
+          "value": "电器",
+          "icon": "electrical_icon.svg"
+        },
+        {
+          "value": "家装",
+          "icon": "shopping_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "home",
+      "icon": "home_icon.svg",
+      "children": [
+        {
+          "value": "话费",
+          "icon": "phone_bill_icon.svg"
+        },
+        {
+          "value": "房租",
+          "icon": "home_bill_icon.svg"
+        },
+        {
+          "value": "水费",
+          "icon": "water_bill_icon.svg"
+        },
+        {
+          "value": "电费",
+          "icon": "electricity_bill_icon.svg"
+        },
+        {
+          "value": "物业",
+          "icon": "home_icon.svg"
+        },
+        {
+          "value": "维修",
+          "icon": "fix_icon.svg"
+        },
+        {
+          "value": "管理费",
+          "icon": "home_icon.svg"
+        },
+        {
+          "value": "网费",
+          "icon": "home_icon.svg"
+        },
+        {
+          "value": "燃气费",
+          "icon": "gas_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "relationship",
+      "icon": "relationship_icon.svg",
+      "children": [
+        {
+          "value": "送礼",
+          "icon": "gift_icon.svg"
+        },
+        {
+          "value": "请客",
+          "icon": "treat_icon.svg"
+        },
+        {
+          "value": "孝心",
+          "icon": "relationship_icon.svg"
+        },
+        {
+          "value": "亲密付",
+          "icon": "relationship_icon.svg"
+        },
+        {
+          "value": "发红包",
+          "icon": "red_packet_icon.svg"
+        },
+        {
+          "value": "借出",
+          "icon": "relationship_icon.svg"
+        },
+        {
+          "value": "还钱",
+          "icon": "relationship_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "medical",
+      "icon": "medical_icon.svg",
+      "children": [
+        {
+          "value": "药品",
+          "icon": "medical_icon.svg"
+        },
+        {
+          "value": "保健",
+          "icon": "medical_icon.svg"
+        },
+        {
+          "value": "治疗",
+          "icon": "medical_icon.svg"
+        },
+        {
+          "value": "美容",
+          "icon": "haircut_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "entertainment",
+      "icon": "entertainment_icon.svg",
+      "children": [
+        {
+          "value": "电子消费",
+          "icon": "member_icon.svg"
+        },
+        {
+          "value": "休闲",
+          "icon": "leisure_icon.svg"
+        },
+        {
+          "value": "约会",
+          "icon": "dating_icon.svg"
+        },
+        {
+          "value": "聚会",
+          "icon": "party_icon.svg"
+        },
+        {
+          "value": "游戏",
+          "icon": "game_icon.svg"
+        },
+        {
+          "value": "健身",
+          "icon": "entertainment_icon.svg"
+        },
+        {
+          "value": "电影",
+          "icon": "movie_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "study",
+      "icon": "study_icon.svg",
+      "children": [
+        {
+          "value": "ChatGPT",
+          "icon": "chatgpt_icon.svg"
+        },
+        {
+          "value": "书籍",
+          "icon": "study_icon.svg"
+        },
+        {
+          "value": "培训",
+          "icon": "study_icon.svg"
+        },
+        {
+          "value": "网课",
+          "icon": "study_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "finance",
+      "icon": "finance_icon.svg",
+      "children": [
+        {
+          "value": "房贷",
+          "icon": "finance_icon.svg"
+        },
+        {
+          "value": "车贷",
+          "icon": "finance_icon.svg"
+        },
+        {
+          "value": "分期",
+          "icon": "finance_icon.svg"
+        },
+        {
+          "value": "手续费",
+          "icon": "finance_icon.svg"
+        },
+        {
+          "value": "保险",
+          "icon": "finance_icon.svg"
+        },
+        {
+          "value": "养卡",
+          "icon": "finance_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "express",
+      "icon": "express_icon.svg",
+      "children": [
+        {
+          "value": "快递到付",
+          "icon": "express_icon.svg"
+        },
+        {
+          "value": "邮寄快递",
+          "icon": "express_icon.svg"
+        }
+      ]
+    },
+    {
+      "value": "other",
+      "icon": "other_icon.svg",
+      "children": [
+        {
+          "value": "旅游",
+          "icon": "travelling_icon.svg"
+        },
+        {
+          "value": "装修",
+          "icon": "other_icon.svg"
+        },
+        {
+          "value": "办事",
+          "icon": "other_icon.svg"
+        }
+      ]
+    }
+  ]
+}

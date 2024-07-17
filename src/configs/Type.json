@@ -1,0 +1,12 @@
+{
+    "default": [
+        {
+            "label": "支出",
+            "value": "expense"
+        },
+        {
+            "label": "收入",
+            "value": "income"
+        }
+    ]
+}
