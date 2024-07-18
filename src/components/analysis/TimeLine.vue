@@ -1,6 +1,9 @@
 <template>
   <div class="timeline-container">
-    <div class="timeline">
+    <div v-if="activities.length === 0">
+      <img class="empty-page" src="@/assets/empty_page.svg" />
+    </div>
+    <div class="timeline" v-else>
       <el-timeline>
         <el-timeline-item
           v-for="(activity, index) in activities"

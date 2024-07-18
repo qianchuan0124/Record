@@ -1,5 +1,8 @@
 <template>
   <div class="total-data">
+    <div v-if="isEmpty">
+      <img class="empty-page" src="@/assets/empty_page.svg" />
+    </div>
     <div ref="myEchart" class="chart"></div>
     <div class="detail-data" v-if="data.length !== 0">
       <div class="detail-container">
@@ -70,6 +73,7 @@ import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { ElMessage } from "element-plus";
 const myEchart = ref<HTMLElement | null>(null);
 const myChart = ref<echarts.ECharts | null>(null);
+const isEmpty = ref(true);
 onMounted(async () => {
   myChart.value = echarts.init(myEchart.value as HTMLDivElement);
   await loadData();
@@ -101,9 +105,10 @@ async function reloadDetailValues(category: string) {
 async function loadData() {
   try {
     const totalData = await fetchTotalCategorysAmount();
+    isEmpty.value = totalData.length === 0;
     const option = {
       title: {
-        text: L10n.review,
+        text: isEmpty.value ? "" : L10n.review,
         left: "center",
       },
       tooltip: {
@@ -257,6 +262,10 @@ const data = ref<CategoryNode[]>([]);
   text-align: right;
 }
 
+.empty-page {
+  max-height: calc(100vh - 450px);
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -266,4 +275,3 @@ const data = ref<CategoryNode[]>([]);
   }
 }
 </style>
-./AnalysisManager ./Manager

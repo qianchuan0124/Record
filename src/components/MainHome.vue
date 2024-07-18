@@ -47,7 +47,7 @@ const tabPosition = ref<TabsInstance["tabPosition"]>("left");
 
 <style>
 .first-top {
-  margin-top: 16px;
+  margin-top: 32px;
 }
 
 .empty-page {
@@ -81,6 +81,7 @@ const tabPosition = ref<TabsInstance["tabPosition"]>("left");
   color: #6b778c;
   font-size: 32px;
   font-weight: 600;
+  margin-top: 24px;
 }
 
 .el-tabs__item {

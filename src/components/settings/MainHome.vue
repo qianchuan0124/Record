@@ -1,6 +1,9 @@
 <template>
   <div class="container">
     <div class="container-top">
+      <div @click="feedbackVisible = true">{{ L10n.update_and_feedback }}</div>
+    </div>
+    <div class="container-bottom">
       <div class="container-left">
         <div class="text-title">{{ L10n.data_handle }}</div>
         <DataHandle></DataHandle>
@@ -11,9 +14,6 @@
       </div>
     </div>
 
-    <div class="container-bottom">
-      <div @click="feedbackVisible = true">{{ L10n.feedback }}</div>
-    </div>
     <el-dialog
       v-model="feedbackVisible"
       :title="L10n.update_and_feedback"
@@ -29,11 +29,20 @@
         </div>
         <el-button
           type="primary"
-          :disabled="isLatestVersion"
+          :disabled="isLatestVersion || isDownloading"
           @click="onTapAction">
           {{ updateTitle }}
         </el-button>
       </div>
+      <el-progress
+        class="update-progress"
+        v-if="isDownloading"
+        :percentage="downloadPercent"
+        :stroke-width="15"
+        status="success"
+        striped
+        striped-flow
+        :duration="10" />
       <div class="bottom-action">
         <div class="open-action">
           <el-button type="primary" @click="openDatabaseDir">
@@ -51,20 +60,12 @@
           </el-button>
         </div>
       </div>
-      <el-progress
-        v-if="isDownloading"
-        :percentage="downloadPercent"
-        :stroke-width="15"
-        status="success"
-        striped
-        striped-flow
-        :duration="10" />
     </el-dialog>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onDeactivated } from "vue";
 import DataHandle from "./DataHandle.vue";
 import CategoryCustom from "./CategoryCustom.vue";
 import Color from "@/configs/Color.json";
@@ -117,19 +118,24 @@ onMounted(() => {
     status.value = "download";
     isLatestVersion.value = false;
   });
-  window.electron.ipcRenderer.on(
-    IpcType.DOWNLOAD_PROGRESS,
-    (event, downloadPercent) => {
-      isDownloading.value = true;
-      downloadPercent.value = downloadPercent;
-    }
-  );
+  window.electron.ipcRenderer.on(IpcType.DOWNLOAD_PROGRESS, (progress) => {
+    isDownloading.value = true;
+    updateTitle.value = L10n.downloading;
+    downloadPercent.value = Number(progress);
+  });
   window.electron.ipcRenderer.on(IpcType.UPDATE_DOWNLOADED, () => {
     logInfo("receive update downloaded");
     isDownloading.value = false;
     updateTitle.value = L10n.install_new_version;
     status.value = "install";
+    ElMessage.success(L10n.new_version_download_success);
   });
+});
+
+onDeactivated(() => {
+  window.electron.ipcRenderer.off(IpcType.UPDATE_AVAILABLE, () => {});
+  window.electron.ipcRenderer.off(IpcType.DOWNLOAD_PROGRESS, () => {});
+  window.electron.ipcRenderer.off(IpcType.UPDATE_DOWNLOADED, () => {});
 });
 </script>
 
@@ -147,6 +153,11 @@ onMounted(() => {
 }
 
 .container-top {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.container-bottom {
   display: flex;
   min-height: 480px;
 }
@@ -222,5 +233,14 @@ onMounted(() => {
 
 .open-action > * {
   flex-grow: 0.5;
+}
+
+.update-progress {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.el-progress__text {
+  min-width: 18px;
 }
 </style>

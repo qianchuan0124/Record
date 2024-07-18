@@ -13,8 +13,11 @@ module.exports = defineConfig({
       builderOptions: {
         appId: "org.electron.record",
         publish: {
-          provider: "generic",
-          url: "http://127.0.0.1:8081/updater/",
+          provider: "github",
+          owner: "qianchuan0124",
+          repo: "record",
+          releaseType: "release",
+          publishAutoUpdate: true,
         },
       },
     },

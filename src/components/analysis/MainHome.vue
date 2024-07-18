@@ -52,6 +52,10 @@ const handleClick = (tab: TabsPaneContext, event: Event) => {
   font-weight: 600;
 }
 
+.el-tabs .el-tabs--top {
+  margin-top: 24px;
+}
+
 :deep(.el-tabs__header) {
   margin-left: 20px !important;
   margin-right: 20px !important;

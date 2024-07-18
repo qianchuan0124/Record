@@ -5,6 +5,7 @@ server/node_modules
 /build
 records.db
 custom-category.json
+tokenInfo.txt
 
 # local env files
 .env.local

@@ -105,5 +105,7 @@
   "is_lastest_version": "已是最新版本",
   "copy_mail_to_clipboard": "已复制开发者邮箱到剪切板",
   "dowload_new_version": "下载新版本",
-  "install_new_version": "安装新版本"
+  "install_new_version": "安装新版本",
+  "new_version_download_success": "新版本下载成功",
+  "downloading": "下载中..."
 }
