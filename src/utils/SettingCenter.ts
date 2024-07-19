@@ -40,4 +40,9 @@ export function settingListener() {
         clipboard.writeText(info.userMail)
         return true
     })
+
+    ipcMain.on(IpcType.OPEN_URL, (event, url) => {
+        logInfo('receive user click url:' + url)
+        shell.openExternal(url)
+    })
 }

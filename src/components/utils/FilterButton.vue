@@ -71,6 +71,9 @@ import {
   watchEffect,
   defineEmits,
   defineExpose,
+  onMounted,
+  onUnmounted,
+  onDeactivated,
 } from "vue";
 import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
@@ -136,9 +139,7 @@ const props = defineProps({
   },
   clickHandler: {
     type: Function as PropType<() => void>,
-    default: () => {
-      console.log("click action...");
-    },
+    default: () => {},
   },
 });
 
@@ -173,9 +174,7 @@ function clickTime() {
 }
 
 function clickCategory() {
-  console.log("click category");
   if (categorySelect.value) {
-    console.log(categorySelect.value);
     categorySelect.value.togglePopperVisible();
   }
 }
@@ -200,30 +199,46 @@ function clickAll() {
 
 function onCategoryChanged(isOpen: boolean) {
   if (!isOpen) {
-    console.log(categoryValue.value);
     emit("update:category", categoryValue.value);
   }
 }
 
 function onTypeChanged(isOpen: boolean) {
   if (!isOpen) {
-    console.log(typeValue.value);
     emit("update:type", typeValue.value);
   }
 }
 
 function onTimeChanged() {
-  console.log(selectedTime.value);
   emit("update:time", selectedTime.value);
 }
 
 function onRemarkChanged() {
-  console.log(remarkValue.value);
   emit("update:remark", remarkValue.value);
 }
 
-notifyCenter.on(NotifyType.CATEGORY_DATA_UPDATE, () => {
-  categoriesOptions.value = getCategories();
+function registerNotify() {
+  notifyCenter.on(NotifyType.CATEGORY_DATA_UPDATE, () => {
+    categoriesOptions.value = getCategories();
+  });
+}
+
+function disableNotify() {
+  notifyCenter.off(NotifyType.CATEGORY_DATA_UPDATE, () => {
+    categoriesOptions.value = getCategories();
+  });
+}
+
+onMounted(() => {
+  registerNotify();
+});
+
+onUnmounted(() => {
+  disableNotify();
+});
+
+onDeactivated(() => {
+  disableNotify();
 });
 </script>
 

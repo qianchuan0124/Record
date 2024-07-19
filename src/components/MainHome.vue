@@ -1,8 +1,5 @@
 <template>
-  <el-tabs
-    :tab-position="tabPosition"
-    style="height: calc(100vh - 72px)"
-    class="demo-tabs">
+  <el-tabs :tab-position="tabPosition" class="demo-tabs">
     <el-tab-pane class="first-top">
       <template #label>
         <span class="custom-tabs-label">
@@ -12,7 +9,7 @@
       </template>
       <DashboardHome></DashboardHome>
     </el-tab-pane>
-    <el-tab-pane label="User">
+    <el-tab-pane label="User" class="analysis-item">
       <template #label>
         <span class="custom-tabs-label">
           <img class="panel_icon" src="@/assets/analysis_icon.svg" />
@@ -21,7 +18,7 @@
       </template>
       <AnalysisHome></AnalysisHome>
     </el-tab-pane>
-    <el-tab-pane label="Config">
+    <el-tab-pane label="Config" class="config-item">
       <template #label>
         <span class="custom-tabs-label">
           <img class="panel_icon" src="@/assets/dashboard_icon.svg" />
@@ -45,9 +42,21 @@ import SettingHome from "./settings/MainHome.vue";
 const tabPosition = ref<TabsInstance["tabPosition"]>("left");
 </script>
 
+<style scoped>
+.demo-tabs {
+  user-select: none;
+  height: calc(100vh - 72px);
+}
+</style>
+
 <style>
 .first-top {
-  margin-top: 32px;
+  margin-top: 12px;
+  overflow-y: scroll;
+}
+
+.analysis-item .config-item {
+  overflow-y: scroll;
 }
 
 .empty-page {
@@ -72,20 +81,16 @@ const tabPosition = ref<TabsInstance["tabPosition"]>("left");
   margin-left: 10px;
 }
 
-.demo-tabs {
-  padding-top: 12px;
-  user-select: none;
-}
-
 .demo-tabs > .el-tabs__content {
   color: #6b778c;
   font-size: 32px;
   font-weight: 600;
   margin-top: 24px;
+  overflow: auto !important;
 }
 
 .el-tabs__item {
-  margin-right: 100px;
+  margin-right: 32px;
   margin-left: 32px;
   margin-bottom: 15px;
   padding-left: 0px !important;
@@ -98,10 +103,10 @@ const tabPosition = ref<TabsInstance["tabPosition"]>("left");
   background-color: white;
 }
 
-.el-tabs--right .el-tabs__content,
+/* .el-tabs--right .el-tabs__content,
 .el-tabs--left .el-tabs__content {
   height: 100%;
-}
+} */
 
 .el-tabs__nav-wrap:after {
   background-color: transparent !important;
@@ -111,4 +116,3 @@ const tabPosition = ref<TabsInstance["tabPosition"]>("left");
   margin-top: 20px;
 }
 </style>
-@/configs/Color.json@/configs/L10n.json

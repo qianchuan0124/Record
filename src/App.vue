@@ -34,8 +34,6 @@ import Color from "@/configs/Color.json";
 html,
 body {
   margin: 0;
-  min-width: 1200px;
-  overflow-x: auto;
 }
 
 .el-header {
@@ -44,5 +42,6 @@ body {
 
 .el-main {
   padding: 0px !important;
+  margin-top: 12px;
 }
 </style>

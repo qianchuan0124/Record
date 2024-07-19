@@ -9,40 +9,43 @@
     </div>
     <div class="action-container">
       <div class="center-input">
-        <div class="top-input">
+        <div class="top-input" ref="centerInput">
           <CreateButton
             ref="categoryButton"
             class="create-item"
             button-type="category"
+            :custom-width="normalInputWidth"
             size="large"></CreateButton>
-          <div class="create-type-amount">
-            <CreateButton
-              ref="typeButton"
-              button-type="type"
-              size="large"
-              class="left"></CreateButton>
-            <CreateButton
-              ref="amountButton"
-              button-type="amount"
-              size="large"></CreateButton>
-          </div>
+          <CreateButton
+            ref="typeButton"
+            button-type="type"
+            size="large"
+            :custom-width="normalInputWidth"
+            class="left"></CreateButton>
+          <CreateButton
+            ref="amountButton"
+            button-type="amount"
+            :custom-width="normalInputWidth"
+            size="large"></CreateButton>
         </div>
         <div class="bottom-input">
           <CreateButton
             ref="timeButton"
             class="create-item"
             button-type="time"
+            :custom-width="normalInputWidth"
             size="large"></CreateButton>
           <CreateButton
             ref="remarkButton"
             button-type="remark"
+            :custom-width="remarkInputWidth"
             size="large"></CreateButton>
         </div>
       </div>
       <div class="right-action">
         <div class="create-button">
           <AccountButton
-            buttonWidth="164px"
+            :buttonWidth="createButtonWidth"
             buttonHeight="77px"
             :button-text="L10n.create"
             textFontSize="28px"
@@ -55,13 +58,23 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, ComponentPublicInstance, onMounted, onDeactivated } from "vue";
+import {
+  ref,
+  ComponentPublicInstance,
+  onMounted,
+  onDeactivated,
+  onUnmounted,
+} from "vue";
 import AccountButton from "@/components/utils/AccountButton.vue";
 import CreateButton from "@/components/utils/CreateButton.vue";
 import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import { ElMessage } from "element-plus";
-import { asyncCreateRecord, fetchTotalAmount } from "@/utils/DataCenter";
+import {
+  asyncCreateRecord,
+  fetchTotalAmount,
+  logInfo,
+} from "@/utils/DataCenter";
 import {
   notifyCenter,
   NotifyType,
@@ -92,7 +105,18 @@ async function createRecord() {
   const remark = remarkButton.value?.getCurrentValue();
   const id = 0;
   const isDeleted = false;
-  console.log(category, type, amount, date, remark);
+  logInfo(
+    "will create record catrgoey: " +
+      category +
+      " type: " +
+      type +
+      " amount: " +
+      amount +
+      " date: " +
+      date +
+      " reamrk: " +
+      remark
+  );
   // 获取返回的内容进一步处理
   const record = {
     id,
@@ -115,7 +139,6 @@ async function createRecord() {
     sendRecordChangeNotify(NotifyType.CREATE_RECORD_SUCCESS, record);
     ElMessage.success(L10n.create_success);
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -134,7 +157,6 @@ async function updateTotalAmount() {
     allIncome.value = "+ " + data.income.toFixed(2);
     allExpend.value = "- " + data.outcome.toFixed(2);
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -145,34 +167,85 @@ async function updateTotalAmount() {
   }
 }
 
-notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, () => {
-  onRecordChanged();
-});
-notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, () => {
-  onRecordChanged();
-});
-notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, () => {
-  onRecordChanged();
-});
+function registerNotify() {
+  notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, () => {
+    onRecordChanged();
+  });
+  notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, () => {
+    onRecordChanged();
+  });
+  notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, () => {
+    onRecordChanged();
+  });
 
-notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, updateTotalAmount);
+  notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, updateTotalAmount);
+}
 
-onDeactivated(() => {
+function disableNotify() {
   notifyCenter.off(NotifyType.CREATE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.UPDATE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.DELETE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, updateTotalAmount);
-});
+}
+
+const totalContainerWidth = ref("250px");
+const inputContainerWidth = ref("550px");
+const actionContainerWidth = ref("750px");
+const normalInputWidth = ref("167px");
+const remarkInputWidth = ref("385px");
+const createButtonWidth = ref("200px");
+const createContainerWidth = ref("142px");
+const createViewWidth = ref("1000px");
+const normalInputRightMargin = ref("12px");
+const centerInput = ref<HTMLElement>();
+
+function handleContainerWidth() {
+  createViewWidth.value = window.innerWidth - 200 + "px";
+  totalContainerWidth.value = (window.innerWidth - 200) * 0.25 + "px";
+  inputContainerWidth.value = (window.innerWidth - 200) * 0.55 + "px";
+  actionContainerWidth.value = (window.innerWidth - 200) * 0.75 + "px";
+  normalInputWidth.value =
+    Math.min(260, (parseInt(inputContainerWidth.value) - 2 * 24) / 3) + "";
+  if (normalInputWidth.value === "260") {
+    normalInputRightMargin.value =
+      (parseInt(inputContainerWidth.value) -
+        parseInt(normalInputWidth.value) * 3) /
+        4 +
+      "px";
+  } else {
+    normalInputRightMargin.value = "12px";
+  }
+
+  remarkInputWidth.value =
+    parseInt(normalInputWidth.value) * 2 +
+    parseInt(normalInputRightMargin.value) +
+    "";
+  createContainerWidth.value = (window.innerWidth - 200) * 0.2 + "px";
+  createButtonWidth.value = parseInt(createContainerWidth.value) - 48 + "px";
+}
 
 onMounted(async () => {
   // 获取总收入和总支出
   updateTotalAmount();
+  window.addEventListener("resize", handleContainerWidth);
+  handleContainerWidth();
+  registerNotify();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", handleContainerWidth);
+  disableNotify();
+});
+
+onDeactivated(() => {
+  window.removeEventListener("resize", handleContainerWidth);
+  disableNotify();
 });
 </script>
 
 <style scoped>
 .total-container {
-  width: 350px;
+  width: v-bind("totalContainerWidth");
   display: flex;
   flex-direction: row;
   justify-content: flex-start;
@@ -198,6 +271,7 @@ onMounted(async () => {
 }
 
 .create-table {
+  width: v-bind("createViewWidth");
   background-color: white;
   border-radius: 10px;
   margin-left: 22px;
@@ -209,7 +283,7 @@ onMounted(async () => {
 
 .action-container {
   display: flex;
-  width: calc(100% - 350px);
+  width: v-bind("actionContainerWidth");
   justify-content: center;
 }
 
@@ -218,14 +292,16 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   justify-content: space-evenly;
-  align-items: center;
 }
 
 .top-input {
   display: flex;
   flex-direction: row;
-  justify-content: center;
-  width: 626px;
+  width: v-bind("inputContainerWidth");
+}
+
+.top-input > * {
+  margin-right: v-bind("normalInputRightMargin");
 }
 
 .bottom-input {
@@ -233,8 +309,14 @@ onMounted(async () => {
   flex-direction: row;
 }
 
+.bottom-input > * {
+  margin-right: v-bind("normalInputRightMargin");
+}
+
 .right-action {
   flex: 0.382;
+  width: v-bind("createContainerWidth");
+  margin-left: 24px;
   display: flex;
   flex-direction: column;
   justify-content: space-evenly;

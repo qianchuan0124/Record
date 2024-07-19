@@ -4,6 +4,7 @@ import CategoryIcon from './CategoryIcon.json'
 import { notifyCenter, NotifyType } from '../utils/NotifyCenter';
 import { fetchCustomCategory } from "@/utils/DataCenter";
 import { CategoryNodeItem } from "@/models/CategoryNodeItem"
+import { logError } from '@/utils/DataCenter';
 
 export interface CategoryItem {
     label: string;
@@ -27,7 +28,7 @@ export async function updateCurrentCategory() {
     }
     catch (error: unknown) {
         currentCategory = defaultCategory
-        console.log("updateCategory failed, error:", error)
+        logError("updateCategory failed, error:" + error)
     }
 }
 

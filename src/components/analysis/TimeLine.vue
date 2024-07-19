@@ -28,7 +28,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, onDeactivated } from "vue";
+import { ref, onMounted, onDeactivated, onUnmounted } from "vue";
 import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import { generateTimeLineNodes, TimeLineNode, recordDetails } from "./Manager";
@@ -38,17 +38,32 @@ const activities = ref<TimeLineNode[]>([]);
 
 const currentActivity = ref<TimeLineNode | null>(null);
 
-notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, loadData);
+function registerNotify() {
+  notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, loadData);
+  notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, loadData);
+  notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, loadData);
+  notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, loadData);
+}
+
+function disableNotify() {
+  notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, loadData);
+  notifyCenter.off(NotifyType.CREATE_RECORD_SUCCESS, loadData);
+  notifyCenter.off(NotifyType.DELETE_RECORD_SUCCESS, loadData);
+  notifyCenter.off(NotifyType.UPDATE_RECORD_SUCCESS, loadData);
+}
 
 onDeactivated(() => {
-  notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, loadData);
+  disableNotify();
+});
+
+onUnmounted(() => {
+  disableNotify();
 });
 
 async function loadData() {
   try {
     activities.value = await generateTimeLineNodes();
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -59,6 +74,7 @@ async function loadData() {
 
 onMounted(async () => {
   loadData();
+  registerNotify();
 });
 </script>
 
@@ -66,8 +82,7 @@ onMounted(async () => {
 .timeline-container {
   display: flex;
   flex-direction: row;
-  min-width: 1200px;
-  width: calc(100vh - 40);
+  width: 100% - 24px;
   height: 100%;
   background-color: white;
   margin: 20px;
@@ -104,7 +119,7 @@ onMounted(async () => {
 .detail-data {
   width: 100%;
   height: 100%;
-  margin-right: 12px;
+  margin-right: 36px;
   margin-top: 12px;
   flex: 0.382;
   display: flex;

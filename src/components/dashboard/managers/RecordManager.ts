@@ -1,7 +1,7 @@
 import L10n from '@/configs/L10n.json';
 import { Record, DailyRecords } from '@/models/Record';
 import { Filter } from "@/models/Filter";
-import { asyncFetchRecords } from "@/utils/DataCenter";
+import { asyncFetchRecords, logError } from "@/utils/DataCenter";
 import { isSameDate } from "@/utils/DateUtils";
 
 export async function fetchRecordsAndGroupByDate(filter: Filter): Promise<DailyRecords[]> {
@@ -47,7 +47,7 @@ export async function fetchRecordsAndGroupByDate(filter: Filter): Promise<DailyR
         })
         return dailyRecords
     } catch (error) {
-        console.error("Fetching records failed:", error);
+        logError("Fetching records failed:" + error);
         throw error; // 或者返回一个默认值，如 return [];
     }
 }
@@ -87,7 +87,7 @@ export async function fetchLastestDaliyRecord(date: Date): Promise<DailyRecords 
         };
     }
     catch (error) {
-        console.error("Fetching records failed:", error);
+        logError("Fetching lastest daily record failed:" + error);
         return null
     }
 }

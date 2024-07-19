@@ -145,6 +145,7 @@ import {
 import * as XLSX from "xlsx";
 import Color from "@/configs/Color.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
+import { logError } from "@/utils/DataCenter";
 const tipVisible = ref(false);
 const tipInfo = ref("");
 const tipType = ref<"export" | "import">("export");
@@ -183,7 +184,6 @@ function handleChange(file: UploadFile) {
           ElMessage.success(L10n.import_success);
           notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
         } catch (error) {
-          console.log(error);
           if (error instanceof Error) {
             ElMessage.error(error.message);
           } else {
@@ -206,9 +206,9 @@ const handleExceed: UploadProps["onExceed"] = (files) => {
 
 function handleError(error: Error) {
   const info = JSON.parse(error.message);
-  console.log(info);
+  logError("handle error info:" + info);
   ElMessage.error(L10n.upload_failed);
-  console.log(error);
+  logError("handle error" + error);
 }
 
 function handleSuccess() {
@@ -217,10 +217,7 @@ function handleSuccess() {
 
 function handleTipAction() {
   if (tipType.value === "export") {
-    console.log("export");
     exportExcel();
-  } else {
-    console.log("import");
   }
 }
 
@@ -240,7 +237,6 @@ async function exportExcel() {
     ElMessage.success(L10n.export_success);
     exportLoading.value = false;
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {

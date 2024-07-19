@@ -4,7 +4,7 @@ import { updateCurrentCategory } from "@/configs/CategoryParser"
 import L10n from "@/configs/L10n.json"
 import { Record } from "@/models/Record";
 import { formatDate } from "@/utils/DateUtils"
-import { fetchAllRecords, importRecords, deleteRecords } from "@/utils/DataCenter"
+import { fetchAllRecords, importRecords, deleteRecords, logError } from "@/utils/DataCenter"
 import { CategorySettingNode } from "@/models/CategorySettingNode"
 
 
@@ -56,7 +56,7 @@ export async function exportAllData(): Promise<string[][]> {
         return result
     }
     catch (error: unknown) {
-        console.error("Export all data failed:", error);
+        logError("Export data failed:" + error);
         throw error;
     }
 }
@@ -192,7 +192,7 @@ export async function importData(records: Record[]) {
             }
         }
         catch (error: unknown) {
-            console.error("Import data failed:", error);
+            logError("Import records failed:" + error);
             await deleteRecords(successIDs);
             throw error;
         }

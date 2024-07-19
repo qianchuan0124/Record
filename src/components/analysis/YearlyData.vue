@@ -94,7 +94,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, onDeactivated } from "vue";
+import { onMounted, ref, onDeactivated, onUnmounted } from "vue";
 import * as echarts from "echarts";
 import {
   fetchYearlyAnalysis,
@@ -105,6 +105,7 @@ import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { ElMessage } from "element-plus";
+import { logError } from "@/utils/DataCenter";
 const startYear = ref<string>((new Date().getFullYear() - 4).toString());
 const endYear = ref<string>(new Date().getFullYear().toString());
 
@@ -187,7 +188,7 @@ async function reloadData() {
     };
     yearlyChart.value?.setOption(option, true);
   } catch (error) {
-    console.log(error);
+    logError("reload yearly data failed " + error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -198,10 +199,26 @@ async function reloadData() {
 
 const yearlyChart = ref<echarts.ECharts | null>(null);
 
-notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, reloadData);
+function registerNotify() {
+  notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, reloadData);
+  notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, reloadData);
+  notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, reloadData);
+  notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, reloadData);
+}
+
+function disableNotify() {
+  notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, reloadData);
+  notifyCenter.off(NotifyType.CREATE_RECORD_SUCCESS, reloadData);
+  notifyCenter.off(NotifyType.DELETE_RECORD_SUCCESS, reloadData);
+  notifyCenter.off(NotifyType.UPDATE_RECORD_SUCCESS, reloadData);
+}
 
 onDeactivated(() => {
-  notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, reloadData);
+  disableNotify();
+});
+
+onUnmounted(() => {
+  disableNotify();
 });
 
 onMounted(async () => {
@@ -215,13 +232,13 @@ onMounted(async () => {
       reloadDetailValues(year, category);
     }
   });
+  registerNotify();
 });
 
 async function reloadDetailValues(year: number, category: string) {
   try {
     data.value = [await generateYearlyCategoryNode(year, category)];
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -245,7 +262,7 @@ const data = ref<CategoryNode[]>([]);
 .yearly-data {
   display: flex;
   align-items: top;
-  min-width: 1200px;
+  width: 100% - 24px;
   width: calc(100vh - 40);
   height: 100%;
   background-color: white;
@@ -289,7 +306,6 @@ const data = ref<CategoryNode[]>([]);
 }
 
 .detail-data {
-  width: calc(100vh - 12);
   height: 100%;
   margin-right: 12px;
   margin-top: 12px;

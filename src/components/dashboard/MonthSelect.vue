@@ -11,7 +11,8 @@
         v-infinite-scroll="load"
         direction="top"
         class="infinite-list"
-        style="overflow: auto">
+        style="overflow: auto"
+        ref="scrollList">
         <li
           v-for="(month, index) in months"
           :key="month.display"
@@ -54,7 +55,14 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, nextTick, defineEmits, onDeactivated } from "vue";
+import {
+  onMounted,
+  ref,
+  nextTick,
+  defineEmits,
+  onDeactivated,
+  onUnmounted,
+} from "vue";
 import { Record } from "@/models/Record";
 import { Month } from "@/models/Month";
 import {
@@ -70,6 +78,7 @@ import { ElMessage } from "element-plus";
 const months = ref<Month[]>([]);
 const currentMonth = ref<string>("");
 const monthList = ref<HTMLElement[]>([]);
+const scrollList = ref<HTMLElement | null>(null);
 const isSelected = ref<number>(0);
 const selectedYear = ref<string>(new Date().getFullYear().toString());
 
@@ -87,13 +96,13 @@ onMounted(async () => {
     await nextTick();
     scrollTo();
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
       ElMessage.error(L10n.system_error);
     }
   }
+  registerNotify();
 });
 const load = async () => {
   const currentYear = months.value[months.value.length - 1].date.getFullYear();
@@ -111,8 +120,6 @@ const load = async () => {
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
-      // 如果error不是Error实例，可以选择一个默认的错误消息
-      console.log(error);
       ElMessage.error(L10n.system_error);
     }
   }
@@ -124,8 +131,9 @@ function scrollTo() {
   }
   const monthIndex = months.value.findIndex((item) => item.isCurrent);
   const monthItem = monthList.value[monthIndex];
-  if (monthItem) {
-    monthItem.scrollIntoView();
+  if (monthItem && scrollList.value) {
+    scrollList.value.scrollTop =
+      monthItem.offsetTop - scrollList.value.offsetTop;
     isSelected.value = monthIndex;
   }
 }
@@ -162,7 +170,6 @@ async function onRecordChanged(record: Record) {
       monthItem.totalIncome = res.income;
       monthItem.totalExpense = res.outcome;
     } catch (error) {
-      console.log(error);
       monthItem.totalIncome = 0;
       monthItem.totalExpense = 0;
       if (error instanceof Error) {
@@ -181,7 +188,6 @@ async function reloadMonthsTotalAmount() {
       month.totalIncome = data.income;
       month.totalExpense = data.outcome;
     } catch (error) {
-      console.log(error);
       if (error instanceof Error) {
         ElMessage.error(error.message);
       } else {
@@ -193,23 +199,33 @@ async function reloadMonthsTotalAmount() {
   });
 }
 
-notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, reloadMonthsTotalAmount);
+function registerNotify() {
+  notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, reloadMonthsTotalAmount);
 
-notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
-notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
-notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
+  notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+  notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+  notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+}
 
-onDeactivated(() => {
+function disableNotify() {
   notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, reloadMonthsTotalAmount);
   notifyCenter.off(NotifyType.CREATE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.UPDATE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.DELETE_RECORD_SUCCESS, onRecordChanged);
+}
+
+onDeactivated(() => {
+  disableNotify();
+});
+
+onUnmounted(() => {
+  disableNotify();
 });
 </script>
 
@@ -223,8 +239,7 @@ onDeactivated(() => {
 }
 
 .infinite-list {
-  /* height: calc(100vh - 500px); */
-  max-height: calc(100vh - 450px);
+  max-height: 620px;
   padding: 0;
   margin: 0;
   list-style: none;

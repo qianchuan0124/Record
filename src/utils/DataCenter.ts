@@ -19,7 +19,6 @@ export function logError(content: string) {
 export async function fetchTotalAmountByDateRange(start: Date, end: Date): Promise<{ income: number, outcome: number }> {
     try {
         const response = await window.electron.ipcRenderer.invoke(IpcType.TOTAL_AMOUNT_BY_DATE_RANGE, start.getTime(), end.getTime());
-        // console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -28,7 +27,7 @@ export async function fetchTotalAmountByDateRange(start: Date, end: Date): Promi
         }
     }
     catch (error: unknown) {
-        console.error("Fetching total amount by date range failed:", error);
+        logError("fetch total amount by range failed " + error)
         throw error;
     }
 }
@@ -36,19 +35,16 @@ export async function fetchTotalAmountByDateRange(start: Date, end: Date): Promi
 // 创建新的记录
 export async function asyncCreateRecord(record: Record): Promise<Record> {
     try {
-        console.log("record: ", record);
         const response = await window.electron.ipcRenderer.invoke(IpcType.CREATE_RECORD, JSON.stringify(record));
-        console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Record created successfully");
             return data.data as Record;
         }
     }
     catch (error: unknown) {
-        console.error("Creating record failed:", error);
+        logError("Creating record failed:" + error);
         throw error;
     }
 }
@@ -57,7 +53,6 @@ export async function asyncCreateRecord(record: Record): Promise<Record> {
 export async function asyncFetchRecords(filter: Filter): Promise<Record[]> {
     try {
         const response = await window.electron.ipcRenderer.invoke(IpcType.FETCH_RECORDS_BY_FILTER, JSON.stringify(filter));
-        // console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -66,7 +61,7 @@ export async function asyncFetchRecords(filter: Filter): Promise<Record[]> {
         }
     }
     catch (error: unknown) {
-        console.error("Fetching records failed:", error);
+        logError("Fetching records failed:" + error);
         throw error;
     }
 }
@@ -75,7 +70,6 @@ export async function asyncFetchRecords(filter: Filter): Promise<Record[]> {
 export async function fetchTotalAmount(): Promise<{ income: number, outcome: number }> {
     try {
         const response = await window.electron.ipcRenderer.invoke(IpcType.TOTAL_AMOUNT);
-        // console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -84,7 +78,7 @@ export async function fetchTotalAmount(): Promise<{ income: number, outcome: num
         }
     }
     catch (error: unknown) {
-        console.error("Fetching total amount failed:", error);
+        logError("fetch total amount failed " + error)
         throw error;
     }
 }
@@ -92,17 +86,17 @@ export async function fetchTotalAmount(): Promise<{ income: number, outcome: num
 // 更新一条记录
 export async function asyncUpdateRecord(record: Record): Promise<Record> {
     try {
+        console.log("asyncUpdateRecord", record);
         const response = await window.electron.ipcRenderer.invoke(IpcType.UPDATE_RECORD, JSON.stringify(record));
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Record updated successfully" + data.data);
             return record;
         }
     }
     catch (error: unknown) {
-        console.error("Updating record failed:", error);
+        logError("Updating record failed:" + error);
         throw error;
     }
 }
@@ -110,16 +104,16 @@ export async function asyncUpdateRecord(record: Record): Promise<Record> {
 // 删除一条记录
 export async function asyncDeleteRecord(record: Record): Promise<void> {
     try {
-        const result = await window.electron.ipcRenderer.invoke(IpcType.DELETE_RECORD, record.id);
+        const result = await window.electron.ipcRenderer.invoke(IpcType.DELETE_RECORD, JSON.stringify(record));
         const data = JSON.parse(result) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Record deleted successfully");
+            logInfo("Record deleted successfully");
         }
     }
     catch (error: unknown) {
-        console.error("Deleting record failed:", error);
+        logError("Deleting record failed:" + error);
         throw error;
     }
 }
@@ -132,12 +126,11 @@ export async function fetchYearlyData(years: string[]): Promise<SingleYearlyData
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Record deleted successfully");
             return data.data as SingleYearlyData[];
         }
     }
     catch (error: unknown) {
-        console.error("Deleting record failed:", error);
+        logError("Fetching yearly data failed:" + error);
         throw error;
     }
 }
@@ -150,12 +143,11 @@ export async function fetchTotalCategorysAmount(): Promise<TotalCategory[]> {
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Record deleted successfully");
             return data.data as TotalCategory[];
         }
     }
     catch (error: unknown) {
-        console.error("Deleting record failed:", error);
+        logError("Fetching total category amount failed:" + error);
         throw error;
     }
 }
@@ -168,12 +160,11 @@ export async function fetchCategoryData(category: string): Promise<SingleCategor
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Record deleted successfully");
             return data.data as SingleCategoryData;
         }
     }
     catch (error: unknown) {
-        console.error("Deleting record failed:", error);
+        logError("Fetching category data failed:" + error);
         throw error;
     }
 }
@@ -186,12 +177,11 @@ export async function fetchYearlyCategoryData(year: number, category: string): P
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Record deleted successfully");
             return data.data as YearlyData;
         }
     }
     catch (error: unknown) {
-        console.error("Deleting record failed:", error);
+        logError("Fetching yearly category data failed:" + error);
         throw error;
     }
 }
@@ -204,12 +194,11 @@ export async function fetchTimeLineData(): Promise<TimeLineRecord[]> {
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Record deleted successfully");
             return data.data as TimeLineRecord[];
         }
     }
     catch (error: unknown) {
-        console.error("Deleting record failed:", error);
+        logError("Fetching time line data failed:" + error);
         throw error;
     }
 }
@@ -220,7 +209,6 @@ export async function fetchTimeLineData(): Promise<TimeLineRecord[]> {
 export async function fetchAllRecords(): Promise<Record[]> {
     try {
         const response = await window.electron.ipcRenderer.invoke(IpcType.ALL_RECORDS_DESC);
-        console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -229,7 +217,7 @@ export async function fetchAllRecords(): Promise<Record[]> {
         }
     }
     catch (error: unknown) {
-        console.error("Exporting all records failed:", error);
+        logError("Fetching all records failed:" + error);
         throw error;
     }
 }
@@ -256,16 +244,15 @@ export async function saveCustomCategory(node: CategorySettingNode) {
             }
         }
         const response = await window.electron.ipcRenderer.invoke(IpcType.SAVE_CUSTOM_CATEGORY, JSON.stringify(req));
-        // console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            console.log("Custom category saved successfully");
+            logInfo("Custom category saved successfully");
         }
     }
     catch (error: unknown) {
-        console.error("Saving custom category failed:", error);
+        logError("Saving custom category failed:" + error);
         throw error;
     }
 }
@@ -274,7 +261,6 @@ export async function saveCustomCategory(node: CategorySettingNode) {
 export async function importRecords(records: Record[]): Promise<Record[]> {
     try {
         const response = await window.electron.ipcRenderer.invoke(IpcType.IMPORT_RECORDS, JSON.stringify(records));
-        console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -283,7 +269,7 @@ export async function importRecords(records: Record[]): Promise<Record[]> {
         }
     }
     catch (error: unknown) {
-        console.error("Exporting all records failed:", error);
+        logError("Importing records failed:" + error);
         throw error;
     }
 }
@@ -292,7 +278,6 @@ export async function importRecords(records: Record[]): Promise<Record[]> {
 export async function deleteRecords(ids: Number[]) {
     try {
         const response = await window.electron.ipcRenderer.invoke(IpcType.PATCH_DELETE_RECORDS, JSON.stringify(ids));
-        console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -301,7 +286,7 @@ export async function deleteRecords(ids: Number[]) {
         }
     }
     catch (error: unknown) {
-        console.error("Exporting all records failed:", error);
+        logError("Deleting records failed:" + error);
         throw error;
     }
 }
@@ -310,18 +295,18 @@ export async function deleteRecords(ids: Number[]) {
 export async function fetchCustomCategory(): Promise<CategoryNodeItem[]> {
     try {
         const response = await window.electron.ipcRenderer.invoke(IpcType.FETCH_CUSTOM_CATEGORY);
-        // console.log("response: ", response);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
         } else {
-            // console.log(data.data)
-
-            return JSON.parse(data.data) as CategoryNodeItem[];
+            if (data.data == null || data.data == "") {
+                return [];
+            }
+            return JSON.parse(data.data).category.custom as CategoryNodeItem[];
         }
     }
     catch (error: unknown) {
-        console.error("Fetching custom category failed:", error);
+        logError("Fetching custom category failed:" + error);
         throw error;
     }
 }

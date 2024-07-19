@@ -7,11 +7,7 @@
     <div class="detail-data" v-if="data.length !== 0">
       <div class="detail-container">
         <div class="detail-title">{{ L10n.detail }}</div>
-        <el-tree-v2
-          style="width: 400px"
-          :data="data"
-          :props="props"
-          :height="550">
+        <el-tree-v2 :data="data" :props="props" :height="550">
           <template #default="{ data }">
             <div v-if="data.level === 0">
               <div class="category-level">
@@ -63,10 +59,14 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, onDeactivated } from "vue";
+import { onMounted, ref, onDeactivated, onUnmounted } from "vue";
 import * as echarts from "echarts";
 import { generateCatgeoryNode, CategoryNode } from "./Manager";
-import { fetchTotalCategorysAmount } from "@/utils/DataCenter";
+import {
+  fetchTotalCategorysAmount,
+  logError,
+  logInfo,
+} from "@/utils/DataCenter";
 import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
@@ -78,22 +78,38 @@ onMounted(async () => {
   myChart.value = echarts.init(myEchart.value as HTMLDivElement);
   await loadData();
   myChart.value.on("click", function (params) {
-    console.log(params);
+    logInfo("TotalData click" + params);
     reloadDetailValues(params.name);
   });
+  registerNotify();
 });
 
-notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, loadData);
+function registerNotify() {
+  notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, loadData);
+  notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, loadData);
+  notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, loadData);
+  notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, loadData);
+}
+
+function disableNotify() {
+  notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, loadData);
+  notifyCenter.off(NotifyType.CREATE_RECORD_SUCCESS, loadData);
+  notifyCenter.off(NotifyType.DELETE_RECORD_SUCCESS, loadData);
+  notifyCenter.off(NotifyType.UPDATE_RECORD_SUCCESS, loadData);
+}
 
 onDeactivated(() => {
-  notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, loadData);
+  disableNotify();
+});
+
+onUnmounted(() => {
+  disableNotify();
 });
 
 async function reloadDetailValues(category: string) {
   try {
     data.value = [await generateCatgeoryNode(category)];
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -142,7 +158,7 @@ async function loadData() {
     };
     myChart.value?.setOption(option);
   } catch (error) {
-    console.log(error);
+    logError("total load data failed " + error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -165,9 +181,8 @@ const data = ref<CategoryNode[]>([]);
 .total-data {
   display: flex;
   align-items: top;
-  min-width: 1200px;
-  width: calc(100vh - 40);
-  height: 100%;
+  width: 100% - 24px;
+  height: 700px;
   background-color: white;
   margin: 20px;
   border-radius: 10px;
@@ -181,7 +196,7 @@ const data = ref<CategoryNode[]>([]);
 }
 
 .detail-data {
-  width: 600px;
+  max-width: 100% - 700px;
   height: 100%;
   margin-right: 12px;
   margin-top: 12px;
@@ -203,7 +218,7 @@ const data = ref<CategoryNode[]>([]);
   font-weight: 700;
   color: v-bind("Color.primary");
   background-color: v-bind("Color.border");
-  width: 388px;
+  max-width: 100% - 700px;
   border-radius: 2px;
   margin-bottom: 12px;
   margin-top: 12px;

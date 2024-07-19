@@ -21,7 +21,7 @@
       <div v-else>
         <div
           v-for="(dailyRecords, index) in records"
-          :key="dailyRecords.id"
+          :key="dailyRecords.id.toString()"
           class="record-group">
           <!-- 展示该组的日期，假设Record对象有一个date属性 -->
           <div @click="toggleCollapse(index)" class="daliy-container">
@@ -50,7 +50,9 @@
           <!-- 遍历该天的每条记录 -->
           <transition name="collapse">
             <ul v-show="!collapsedIds[index]">
-              <li v-for="record in dailyRecords.records" :key="record.id">
+              <li
+                v-for="record in dailyRecords.records"
+                :key="record.id.toString()">
                 <!-- 展示每条记录的内容，这里假设有一个content属性 -->
                 <el-row
                   class="record-cell"
@@ -93,29 +95,31 @@
                   v-if="record.id === selectedRecord?.id"
                   class="select-record-container">
                   <el-row class="select-record-cell">
-                    <el-col :span="2" class="select-record-item"></el-col>
-                    <el-col :span="4">
-                      <CreateButton
-                        :ref="(el: CreateButtonType) => { if (el) categoryRefs = { button: el, recordId: record.id }; }"
-                        button-type="category"
-                        size="small"
-                        :content="selectedRecord.subCategory"></CreateButton>
-                    </el-col>
-                    <el-col :span="1" class="select-record-item"></el-col>
-                    <el-col :span="9" class="select-type-amount">
-                      <CreateButton
-                        class="first-button"
-                        :ref="(el: CreateButtonType) => { if (el) typeRefs = { button: el, recordId: record.id }; }"
-                        button-type="type"
-                        size="small"
-                        :content="selectedRecord.type"></CreateButton>
-                      <CreateButton
-                        button-type="amount"
-                        :ref="(el: CreateButtonType) => { if (el) amountRefs = { button: el, recordId: record.id }; }"
-                        size="small"
-                        :content="
-                          selectedRecord.amount.toString()
-                        "></CreateButton>
+                    <!-- <el-col :span="2" class="select-record-item"></el-col> -->
+                    <el-col :span="16" ref="editContainer">
+                      <div class="top-input-elements">
+                        <CreateButton
+                          :ref="(el: CreateButtonType) => { if (el) categoryRefs = { button: el, recordId: record.id }; }"
+                          button-type="category"
+                          :custom-width="normalInputWidth"
+                          size="small"
+                          :content="selectedRecord.subCategory"></CreateButton>
+                        <CreateButton
+                          class="first-button"
+                          :ref="(el: CreateButtonType) => { if (el) typeRefs = { button: el, recordId: record.id }; }"
+                          button-type="type"
+                          :custom-width="normalInputWidth"
+                          size="small"
+                          :content="selectedRecord.type"></CreateButton>
+                        <CreateButton
+                          button-type="amount"
+                          :ref="(el: CreateButtonType) => { if (el) amountRefs = { button: el, recordId: record.id }; }"
+                          size="small"
+                          :custom-width="normalInputWidth"
+                          :content="
+                            selectedRecord.amount.toString()
+                          "></CreateButton>
+                      </div>
                     </el-col>
                     <el-col :span="1" class="select-record-item"></el-col>
                     <el-col :span="7" class="select-record-action">
@@ -128,23 +132,24 @@
                     </el-col>
                   </el-row>
                   <el-row class="select-record-cell">
-                    <el-col :span="2" class="select-record-item"></el-col>
-                    <el-col :span="4">
-                      <CreateButton
-                        button-type="time"
-                        :ref="(el: CreateButtonType) => { if (el) timeRefs = { button: el, recordId: record.id }; }"
-                        size="small"
-                        :content="
-                          new Date(selectedRecord.date).toISOString()
-                        "></CreateButton>
-                    </el-col>
-                    <el-col :span="1" class="select-record-item"></el-col>
-                    <el-col :span="9">
-                      <CreateButton
-                        button-type="remark"
-                        :ref="(el: CreateButtonType) => { if (el) remarkRefs = { button: el, recordId: record.id }; }"
-                        size="small"
-                        :content="selectedRecord.remark"></CreateButton>
+                    <!-- <el-col :span="2" class="select-record-item"></el-col> -->
+                    <el-col :span="16">
+                      <div class="top-input-elements">
+                        <CreateButton
+                          button-type="time"
+                          :custom-width="normalInputWidth"
+                          :ref="(el: CreateButtonType) => { if (el) timeRefs = { button: el, recordId: record.id }; }"
+                          size="small"
+                          :content="
+                            new Date(selectedRecord.date).toISOString()
+                          "></CreateButton>
+                        <CreateButton
+                          button-type="remark"
+                          :custom-width="remarkInputWidth"
+                          :ref="(el: CreateButtonType) => { if (el) remarkRefs = { button: el, recordId: record.id }; }"
+                          size="small"
+                          :content="selectedRecord.remark"></CreateButton>
+                      </div>
                     </el-col>
                     <el-col :span="1" class="select-record-item"></el-col>
                     <el-col :span="7" class="select-record-action">
@@ -194,6 +199,7 @@ import {
   defineExpose,
   ComponentPublicInstance,
   onDeactivated,
+  onUnmounted,
 } from "vue";
 import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
@@ -287,7 +293,6 @@ async function deleteRecord() {
     ElMessage.success(L10n.delete_success);
     deleteConfirmVisible.value = false;
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -337,7 +342,6 @@ async function updateRecord() {
     selectedRecord.value = null;
     ElMessage.success(L10n.update_success);
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -354,7 +358,6 @@ async function refreshData(filter: Filter) {
     records.value = data;
     isLoaded.value = true;
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -377,22 +380,28 @@ defineExpose({
   onFilterChanged,
 });
 
-notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, reloadData);
-notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
-notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
-notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
+function registerNotify() {
+  notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, reloadData);
+  notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+  notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+  notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+}
 
-onDeactivated(() => {
+function disableNotify() {
   notifyCenter.off(NotifyType.IMPORT_DATA_SUCCESS, reloadData);
   notifyCenter.off(NotifyType.CREATE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.UPDATE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.DELETE_RECORD_SUCCESS, onRecordChanged);
+}
+
+onDeactivated(() => {
+  disableNotify();
 });
 
 async function onRecordChanged(record: Record) {
@@ -444,7 +453,6 @@ async function onRecordChanged(record: Record) {
       }
     }
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -453,22 +461,51 @@ async function onRecordChanged(record: Record) {
   }
 }
 
+const normalInputWidth = ref("125px");
+const remarkInputWidth = ref("250px");
+const normalInputLeftMargin = ref("12px");
+const editContainer = ref<HTMLElement>();
+
+function handleContainerWidth() {
+  const totalWidth =
+    editContainer.value?.offsetWidth ?? window.innerWidth * 0.5 - 48;
+  normalInputWidth.value = Math.min(260, (totalWidth - 2 * 24) / 3) + "";
+  if (normalInputWidth.value === "260") {
+    normalInputLeftMargin.value =
+      (totalWidth - Number(normalInputWidth.value) * 3) / 4 + "px";
+  } else {
+    normalInputLeftMargin.value = "12px";
+  }
+  remarkInputWidth.value =
+    parseInt(normalInputWidth.value) * 2 +
+    parseInt(normalInputLeftMargin.value) +
+    "";
+}
+
 onMounted(async () => {
   refreshData(currentFilter.value);
   // 初始化折叠状态
   collapsedIds.value = Array(records.value.length).fill(false);
+  window.addEventListener("resize", handleContainerWidth);
+  handleContainerWidth();
+  registerNotify();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", handleContainerWidth);
+  disableNotify();
 });
 </script>
 
 <style scoped>
 .records-container {
-  max-height: calc(100vh - 400px); /* 保证内容区域不超过屏幕高度 */
+  max-height: 620px;
   overflow-y: auto;
   user-select: none !important;
 }
 
 .empty-page {
-  max-height: calc(100vh - 450px);
+  max-height: 620px;
 }
 
 ul {
@@ -609,19 +646,26 @@ ul {
 .record-category-item {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .record-category-item img {
   width: 22px;
   height: 22px;
-  margin-right: 10px;
-  margin-left: 30%;
+  margin-right: 12px;
 }
 
 ul {
   margin: 0;
   padding: 0;
 }
+
+.top-input-elements {
+  display: flex;
+  flex-direction: row;
+}
+
+.top-input-elements > * {
+  margin-left: v-bind("normalInputLeftMargin");
+}
 </style>
-@/components/dashboard/FilterManager@/components/dashboard/MonthManager@/components/dashboard/RecordManager
-@/conifgs/CategoryParser @/configs/Color.json@/configs/L10n.json

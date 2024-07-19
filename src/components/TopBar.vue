@@ -9,6 +9,25 @@
 
 <script setup>
 import Color from "@/configs/Color.json";
+import { onDeactivated, onMounted, onUnmounted, ref } from "vue";
+
+const containerWidth = ref("1200px");
+function handleContainerWidth() {
+  containerWidth.value = window.innerWidth + "px";
+}
+
+onMounted(() => {
+  window.addEventListener("resize", handleContainerWidth);
+  handleContainerWidth();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", handleContainerWidth);
+});
+
+onDeactivated(() => {
+  window.removeEventListener("resize", handleContainerWidth);
+});
 </script>
 
 <style scoped>
@@ -22,7 +41,7 @@ import Color from "@/configs/Color.json";
   height: 72px;
   background-color: white;
   margin-bottom: 20px;
-  min-width: 1200px;
+  width: v-bind("containerWidth");
 }
 
 .title {

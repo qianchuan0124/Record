@@ -1,5 +1,8 @@
 <template>
-  <div v-if="buttonType === 'category'" class="button-style">
+  <div
+    v-if="buttonType === 'category'"
+    class="button-style"
+    :style="{ width: buttonWidth }">
     <span class="button-title">{{ L10n.category }}</span>
     <el-cascader
       :style="{ width: width, height: height }"
@@ -10,7 +13,10 @@
       popper-class="custom-poper"
       filterable />
   </div>
-  <div v-else-if="buttonType === 'amount'" class="button-style">
+  <div
+    v-else-if="buttonType === 'amount'"
+    class="button-style"
+    :style="{ width: buttonWidth }">
     <span class="button-title">{{ L10n.amount }}</span>
     <el-input
       v-model="amountValue"
@@ -18,7 +24,10 @@
       type="number"
       :placeholder="`${L10n.amount_placeholder}`" />
   </div>
-  <div v-else-if="buttonType === 'type'" class="button-style">
+  <div
+    v-else-if="buttonType === 'type'"
+    class="button-style"
+    :style="{ width: buttonWidth }">
     <span class="button-title">{{ L10n.type }}</span>
     <el-cascader
       :style="{ width: width, height: height }"
@@ -26,7 +35,10 @@
       :options="typeOptions"
       :props="categoryProps" />
   </div>
-  <div v-else-if="buttonType === 'remark'" class="button-style">
+  <div
+    v-else-if="buttonType === 'remark'"
+    class="button-style"
+    :style="{ width: buttonWidth }">
     <span class="button-title">{{ L10n.remark }}</span>
     <el-input
       v-model="remarkValue"
@@ -34,7 +46,10 @@
       :placeholder="`${L10n.remark_placeholder}`"
       clearable />
   </div>
-  <div v-else-if="buttonType === 'time'" class="button-style">
+  <div
+    v-else-if="buttonType === 'time'"
+    class="button-style"
+    :style="{ width: buttonWidth }">
     <span class="button-title">{{ L10n.time }}</span>
     <el-date-picker
       :style="`width:${width}`"
@@ -54,6 +69,9 @@ import {
   watchEffect,
   onMounted,
   defineExpose,
+  watch,
+  onUnmounted,
+  onDeactivated,
 } from "vue";
 import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
@@ -132,6 +150,10 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  customWidth: {
+    type: String,
+    default: "0",
+  },
   buttonType: {
     type: String as PropType<
       "category" | "type" | "amount" | "time" | "remark"
@@ -140,9 +162,7 @@ const props = defineProps({
   },
   clickHandler: {
     type: Function as PropType<() => void>,
-    default: () => {
-      console.log("click action...");
-    },
+    default: () => {},
   },
 });
 
@@ -160,16 +180,37 @@ const calculateDimensions = () => {
     case "type":
       switch (props.size) {
         case "small":
-          width.value = "115px";
-          buttonWidth.value = "165px";
-          height.value = "30px";
+          if (props.customWidth === "0") {
+            width.value = "115px";
+            buttonWidth.value = "165px";
+            height.value = "30px";
+          } else {
+            width.value = `${parseInt(props.customWidth) - 50}px`;
+            buttonWidth.value = props.customWidth + "px";
+            height.value = "30px";
+          }
           break;
         case "large":
-          width.value = "145px";
-          buttonWidth.value = "195px";
-          height.value = "30px";
+          if (props.customWidth === "0") {
+            width.value = "145px";
+            buttonWidth.value = "195px";
+            height.value = "30px";
+          } else {
+            width.value = `${parseInt(props.customWidth) - 50}px`;
+            buttonWidth.value = props.customWidth + "px";
+            height.value = "30px";
+          }
           break;
         default:
+          if (props.customWidth === "0") {
+            width.value = "115px";
+            buttonWidth.value = "165px";
+            height.value = "30px";
+          } else {
+            width.value = `${parseInt(props.customWidth) - 50}px`;
+            buttonWidth.value = props.customWidth + "px";
+            height.value = "30px";
+          }
           width.value = "115px"; // 默认值
           buttonWidth.value = "165px";
           height.value = "30px";
@@ -178,14 +219,26 @@ const calculateDimensions = () => {
     case "remark":
       switch (props.size) {
         case "small":
-          width.value = "295px";
-          buttonWidth.value = "345px";
-          height.value = "30px";
+          if (props.customWidth === "0") {
+            width.value = "295px";
+            buttonWidth.value = "345px";
+            height.value = "30px";
+          } else {
+            width.value = `${parseInt(props.customWidth) - 50}px`;
+            buttonWidth.value = props.customWidth + "px";
+            height.value = "30px";
+          }
           break;
         case "large":
-          width.value = "355px";
-          buttonWidth.value = "405px";
-          height.value = "30px";
+          if (props.customWidth === "0") {
+            width.value = "355px";
+            buttonWidth.value = "405px";
+            height.value = "30px";
+          } else {
+            width.value = `${parseInt(props.customWidth) - 50}px`;
+            buttonWidth.value = props.customWidth + "px";
+            height.value = "30px";
+          }
           break;
         default:
           width.value = "115px";
@@ -196,14 +249,26 @@ const calculateDimensions = () => {
     default:
       switch (props.size) {
         case "small":
-          width.value = "115px";
-          buttonWidth.value = "165px";
-          height.value = "30px";
+          if (props.customWidth === "0") {
+            width.value = "115px";
+            buttonWidth.value = "165px";
+            height.value = "30px";
+          } else {
+            width.value = `${parseInt(props.customWidth) - 50}px`;
+            buttonWidth.value = props.customWidth + "px";
+            height.value = "30px";
+          }
           break;
         case "large":
-          width.value = "145px";
-          buttonWidth.value = "195px";
-          height.value = "30px";
+          if (props.customWidth === "0") {
+            width.value = "145px";
+            buttonWidth.value = "195px";
+            height.value = "30px";
+          } else {
+            width.value = `${parseInt(props.customWidth) - 50}px`;
+            buttonWidth.value = props.customWidth + "px";
+            height.value = "30px";
+          }
           break;
         default:
           width.value = "115px";
@@ -213,11 +278,22 @@ const calculateDimensions = () => {
   }
 };
 
+watch(
+  () => props.customWidth,
+  () => {
+    calculateDimensions();
+  },
+  {
+    immediate: true, // 立即执行一次
+  }
+);
+
 watchEffect(() => {
   calculateDimensions();
 });
 
 onMounted(() => {
+  notifyCenter.on(NotifyType.CATEGORY_DATA_UPDATE, updateCategorys);
   const content = props.content;
   let findType; // Move the declaration outside of the switch statement
   if (content) {
@@ -248,15 +324,22 @@ onMounted(() => {
         break;
     }
   } else {
-    categoriesOptions.value = getCategories();
-    initValue();
+    updateCategorys();
   }
 });
 
-notifyCenter.on(NotifyType.CATEGORY_DATA_UPDATE, () => {
+onUnmounted(() => {
+  notifyCenter.off(NotifyType.CATEGORY_DATA_UPDATE, updateCategorys);
+});
+
+onDeactivated(() => {
+  notifyCenter.off(NotifyType.CATEGORY_DATA_UPDATE, updateCategorys);
+});
+
+function updateCategorys() {
   categoriesOptions.value = getCategories();
   initValue();
-});
+}
 </script>
 
 <style scoped>
@@ -264,6 +347,7 @@ notifyCenter.on(NotifyType.CATEGORY_DATA_UPDATE, () => {
   font-size: 14px;
   color: v-bind("Color.info");
   margin-right: 10px;
+  min-width: 30px;
   user-select: none !important;
 }
 .button-style {

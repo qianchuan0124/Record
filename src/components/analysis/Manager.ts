@@ -4,7 +4,7 @@ import { Record } from "@/models/Record";
 import L10n from "@/configs/L10n.json"
 import { formatDate } from "@/utils/DateUtils"
 import { SingleYearlyData, SingleCategoryData, YearlyData, TimeLineRecord } from "@/models/AnalysisData"
-import { fetchYearlyData, fetchCategoryData, fetchYearlyCategoryData, fetchTimeLineData } from "@/utils/DataCenter"
+import { fetchYearlyData, fetchCategoryData, fetchYearlyCategoryData, fetchTimeLineData, logError } from "@/utils/DataCenter"
 
 export interface YearlyAnalysis {
     name: string;
@@ -38,7 +38,7 @@ export async function fetchYearlyAnalysis(yearsData: string[]): Promise<YearlyAn
         }));
     }
     catch (error: unknown) {
-        console.error("Creating record failed:", error);
+        logError("Creating record failed:" + error);
         throw error; // 或者返回一个默认值，如 return [];
     }
 }
@@ -70,7 +70,7 @@ export async function generateCatgeoryNode(category: string): Promise<CategoryNo
         return parseCategoryData(data);
     }
     catch (error: unknown) {
-        console.error("Creating record failed:", error);
+        logError("Creating record failed:" + error);
         throw error; // 或者返回一个默认值，如 return [];
     }
 }
@@ -106,7 +106,7 @@ export async function generateYearlyCategoryNode(year: number, category: string)
         return parseYearlyCategoryData(data);
     }
     catch (error: unknown) {
-        console.error("Creating record failed:", error);
+        logError("Creating record failed:" + error);
         throw error; // 或者返回一个默认值，如 return [];
     }
 }
@@ -160,7 +160,7 @@ export async function generateTimeLineNodes(): Promise<TimeLineNode[]> {
         return parseTimeLineData(data);
     }
     catch (error: unknown) {
-        console.error("Creating record failed:", error);
+        logError("Creating record failed:" + error);
         return []
     }
 }

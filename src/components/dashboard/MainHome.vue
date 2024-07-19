@@ -22,7 +22,13 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, ComponentPublicInstance } from "vue";
+import {
+  ref,
+  ComponentPublicInstance,
+  onMounted,
+  onUnmounted,
+  onDeactivated,
+} from "vue";
 import Color from "@/configs/Color.json";
 import CreateView from "./CreateView.vue";
 import FilterView from "./FilterView.vue";
@@ -41,6 +47,8 @@ const monthSelect = ref<ComponentPublicInstance<typeof MonthSelect> | null>(
 
 const filterView = ref<ComponentPublicInstance<typeof FilterView> | null>(null);
 
+const dashboardHeight = ref<string>("700px");
+
 function handleMonthChanged(month: Month) {
   filterView.value?.onMonthChanged(month);
 }
@@ -48,16 +56,48 @@ function handleMonthChanged(month: Month) {
 function handleFilterChanged(filter: Filter) {
   contentView.value?.onFilterChanged(filter);
 }
+
+function handleContainerWidth() {
+  dashboardHeight.value = window.innerHeight - 120 + "px";
+}
+
+onMounted(() => {
+  window.addEventListener("resize", handleContainerWidth);
+  handleContainerWidth();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("resize", handleContainerWidth);
+});
+
+onDeactivated(() => {
+  window.removeEventListener("resize", handleContainerWidth);
+});
 </script>
 
 <style scoped>
 .container {
   background-color: v-bind("Color.background");
-  height: 100%;
   width: 100%;
-  min-width: 1200px;
-  overflow-x: auto;
+  min-width: 800px;
+  height: v-bind("dashboardHeight");
+  overflow: auto !important;
   user-select: none !important;
+}
+
+/* 针对Webkit浏览器隐藏滚动条 */
+.container::-webkit-scrollbar {
+  display: none;
+}
+
+/* 对于支持scrollbar-width属性的浏览器（如Firefox），也隐藏滚动条 */
+.container {
+  scrollbar-width: none;
+}
+
+.el-tabs--right {
+  overflow-y: auto; /* 只在垂直方向上显示滚动条 */
+  overflow-x: hidden; /* 隐藏水平方向的滚动条 */
 }
 
 .content-container {
@@ -73,4 +113,3 @@ function handleFilterChanged(filter: Filter) {
   flex-grow: 1;
 }
 </style>
-./managers/MonthManager./managers/FilterManager @/configs/Color.json

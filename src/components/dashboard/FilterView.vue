@@ -1,12 +1,12 @@
 <template>
   <div class="filter-table-container">
     <el-row class="filter-table">
-      <el-col :span="6" class="filter-list-left">
+      <el-col :span="7" class="filter-list-left">
         <span class="filter-title">{{ L10n.bill_list }}</span>
         <span class="filter-title-time">{{ displayDate }}</span>
       </el-col>
-      <el-col :span="7"></el-col>
-      <el-col :span="10" class="filter-list-right">
+      <el-col :span="5"></el-col>
+      <el-col :span="11" class="filter-list-right">
         <span class="filter-item-title">{{ L10n.all_income }}</span>
         <span class="filter-item-income">{{ income }}</span>
         <span class="filter-item-reamin-units span-divider">|</span>
@@ -19,29 +19,27 @@
       </el-col>
     </el-row>
     <el-row class="filter-table filter-items">
-      <el-col :span="2">
-        <FilterButton button-type="all" @is-all="handleClickAll"></FilterButton>
+      <el-col :span="12">
+        <div class="filter-button-list">
+          <FilterButton
+            button-type="all"
+            @is-all="handleClickAll"></FilterButton>
+          <FilterButton
+            button-type="category"
+            ref="categoryFilter"
+            @update:category="handleCategoryUpdate"></FilterButton>
+          <FilterButton
+            button-type="type"
+            ref="typeFilter"
+            @update:type="handleTypeUpdate"></FilterButton>
+          <FilterButton
+            button-type="time"
+            ref="timeFilter"
+            @update:time="handleTimeUpdate"></FilterButton>
+        </div>
       </el-col>
-      <el-col :span="2">
-        <FilterButton
-          button-type="category"
-          ref="categoryFilter"
-          @update:category="handleCategoryUpdate"></FilterButton>
-      </el-col>
-      <el-col :span="2">
-        <FilterButton
-          button-type="type"
-          ref="typeFilter"
-          @update:type="handleTypeUpdate"></FilterButton>
-      </el-col>
-      <el-col :span="2">
-        <FilterButton
-          button-type="time"
-          ref="timeFilter"
-          @update:time="handleTimeUpdate"></FilterButton>
-      </el-col>
-      <el-col :span="8"></el-col>
-      <el-col :span="8">
+      <el-col :span="5"></el-col>
+      <el-col :span="7">
         <div class="remark-filter">
           <FilterButton
             button-type="remark"
@@ -64,6 +62,7 @@ import {
   defineExpose,
   ComponentPublicInstance,
   defineEmits,
+  onUnmounted,
 } from "vue";
 import { Record } from "@/models/Record";
 import { Month } from "@/models/Month";
@@ -153,7 +152,6 @@ async function updateDisplayValues(startDate: Date, endDate: Date) {
         ? "+ " + remainValue.toFixed(2)
         : "- " + Math.abs(remainValue).toFixed(2);
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -195,20 +193,26 @@ function onRecordChanged(record: Record) {
   }
 }
 
-notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
-notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
-notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, (record: Record) => {
-  onRecordChanged(record);
-});
+function registerNotify() {
+  notifyCenter.on(NotifyType.CREATE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+  notifyCenter.on(NotifyType.UPDATE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+  notifyCenter.on(NotifyType.DELETE_RECORD_SUCCESS, (record: Record) => {
+    onRecordChanged(record);
+  });
+}
 
-onDeactivated(() => {
+function disableNotify() {
   notifyCenter.off(NotifyType.CREATE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.UPDATE_RECORD_SUCCESS, onRecordChanged);
   notifyCenter.off(NotifyType.DELETE_RECORD_SUCCESS, onRecordChanged);
+}
+
+onDeactivated(() => {
+  disableNotify();
 });
 
 defineExpose({
@@ -225,6 +229,11 @@ function loadData() {
 
 onMounted(() => {
   loadData();
+  registerNotify();
+});
+
+onUnmounted(() => {
+  disableNotify();
 });
 </script>
 
@@ -315,6 +324,14 @@ span {
   justify-content: flex-end;
   margin-right: 36px;
 }
+
+.filter-button-list {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+.filter-button-list > * {
+  margin-right: 24px;
+}
 </style>
-@/components/dashboard/MonthManager@/components/dashboard/RecordManager@/components/dashboard/FilterManager
-@/conifgs/CategoryParser @/configs/Color.json@/configs/L10n.json

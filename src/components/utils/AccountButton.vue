@@ -28,9 +28,7 @@ const props = defineProps({
   },
   clickHandler: {
     type: Function as PropType<() => void>,
-    default: () => {
-      console.log("click action...");
-    },
+    default: () => {},
   },
 });
 

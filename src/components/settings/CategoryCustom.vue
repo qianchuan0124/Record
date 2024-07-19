@@ -1,7 +1,7 @@
 <template>
   <div class="custom-category">
     <el-tree
-      style="max-width: 600px"
+      style="width: 50% - 24px"
       :allow-drop="allowDrop"
       :allow-drag="allowDrag"
       :expand-on-click-node="false"
@@ -88,6 +88,7 @@ import { ElMessage } from "element-plus";
 import cloneDeep from "lodash/cloneDeep";
 import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
+import { updateCurrentCategory } from "@/configs/CategoryParser";
 const addFormVisible = ref(false);
 const saveVisible = ref(false);
 const newCategory = ref("");
@@ -108,7 +109,6 @@ onMounted(async () => {
     initSource = cloneDeep(data);
     defaultSource = await getCategorySettingNode("default");
   } catch (error) {
-    console.log(error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
     } else {
@@ -178,9 +178,9 @@ async function save() {
   if (currentCustomCategory.value) {
     try {
       await saveCustomCategory(currentCustomCategory.value);
+      await updateCurrentCategory();
       ElMessage.success(L10n.save_success);
     } catch (error) {
-      console.log(error);
       if (error instanceof Error) {
         ElMessage.error(error.message);
       } else {
@@ -291,11 +291,11 @@ const allowDrop = (draggingNode: Node, dropNode: Node, type: AllowDropType) => {
 
 .custom-category {
   height: 500px;
-  width: 620px;
+  width: 50% - 24px;
+  max-width: 600px;
   padding: 12px;
   border: 1px solid v-bind("Color.border"); /* 设置边框样式 */
   border-radius: 10px; /* 设置圆角边框 */
   overflow-y: auto;
 }
 </style>
-./SettingManager ./Manager
