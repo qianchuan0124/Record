@@ -5,6 +5,9 @@
   "win": {
     "icon": "public/favicon.ico"
   },
+  "mac": {
+    "icon": "public/favicon.icns"
+  },
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
@@ -25,7 +28,7 @@
     "echarts": "^5.5.1",
     "electron-log": "~4.4.8",
     "electron-updater": "^6.2.1",
-    "element-plus": "^2.7.5",
+    "element-plus": "^2.7.7",
     "react-scripts": "^5.0.1",
     "sqlite3": "5.1.6",
     "ts-loader": "~8.2.0",

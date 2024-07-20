@@ -210,11 +210,12 @@ import { ElMessage } from "element-plus";
 import { Filter } from "@/models/Filter";
 import { getFirstAndLastDate } from "./managers/MonthManager";
 import { Record, DailyRecords } from "@/models/Record";
+import { fetchRecordsAndGroupByDate } from "./managers/RecordManager";
 import {
-  fetchRecordsAndGroupByDate,
-  fetchLastestDaliyRecord,
-} from "./managers/RecordManager";
-import { asyncUpdateRecord, asyncDeleteRecord } from "@/utils/DataCenter";
+  asyncUpdateRecord,
+  asyncDeleteRecord,
+  logInfo,
+} from "@/utils/DataCenter";
 import { findCategoryIconByValue } from "@/configs/CategoryParser";
 import { formatDateBySlash } from "@/utils/DateUtils";
 import {
@@ -222,7 +223,6 @@ import {
   NotifyType,
   sendRecordChangeNotify,
 } from "@/utils/NotifyCenter";
-import { isBetweenDates, isSameDate } from "@/utils/DateUtils";
 
 type CreateButtonType = ComponentPublicInstance<typeof CreateButton>;
 
@@ -288,7 +288,6 @@ async function deleteRecord() {
         selectedRecord.value
       );
     }
-
     selectedRecord.value = null;
     ElMessage.success(L10n.delete_success);
     deleteConfirmVisible.value = false;
@@ -405,53 +404,10 @@ onDeactivated(() => {
 });
 
 async function onRecordChanged(record: Record) {
-  if (
-    !isBetweenDates(
-      record.date,
-      currentFilter.value.startTime,
-      currentFilter.value.endTime
-    )
-  ) {
-    return;
-  }
-
   try {
-    const newDaliyRecord = await fetchLastestDaliyRecord(record.date);
-
-    const changedDaliyRecordId = records.value.findIndex((dailyRecords) =>
-      dailyRecords.records.some((item) => item.id === record.id)
-    );
-
-    if (newDaliyRecord == null) {
-      if (changedDaliyRecordId === -1) {
-        return;
-      } else {
-        records.value.splice(changedDaliyRecordId, 1);
-      }
-    } else {
-      if (changedDaliyRecordId === -1) {
-        // 根据日期逆序插入到何时的位置
-        const currentDaliyDate = new Date(newDaliyRecord.date);
-        const daliyIndex = records.value.findIndex((dailyRecords) => {
-          const daliyDate = new Date(dailyRecords.date);
-          return isSameDate(daliyDate, currentDaliyDate);
-        });
-        if (daliyIndex !== -1) {
-          records.value[daliyIndex] = newDaliyRecord;
-        } else {
-          const insertIndex = records.value.findIndex(
-            (dailyRecords) => dailyRecords.date < newDaliyRecord.date
-          );
-          if (insertIndex === -1) {
-            records.value.push(newDaliyRecord);
-          } else {
-            records.value.splice(insertIndex, 0, newDaliyRecord);
-          }
-        }
-      } else {
-        records.value[changedDaliyRecordId] = newDaliyRecord;
-      }
-    }
+    logInfo("onRecordChanged" + record);
+    const newRecords = await fetchRecordsAndGroupByDate(currentFilter.value);
+    records.value = newRecords;
   } catch (error) {
     if (error instanceof Error) {
       ElMessage.error(error.message);
@@ -603,10 +559,10 @@ ul {
 }
 
 .select-record-action {
-  width: 50%; /* 或其他固定宽度 */
-  margin-left: auto;
-  margin-right: auto;
-  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
   border-left: 1px solid v-bind("Color.border");
 }
 

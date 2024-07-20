@@ -31,6 +31,7 @@ async function createWindow() {
         height: defaultSize().height,
         minWidth: 1200,
         minHeight: 700,
+        icon: path.join(__dirname, '../public/favicon.png'),
         webPreferences: {
 
             // Use pluginOptions.nodeIntegration, leave this alone
