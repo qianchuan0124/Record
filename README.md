@@ -17,29 +17,21 @@
 具体功能如下:
 
 1. 记录账单数据、根据总 -> 年 -> 月 -> 日查看当前的开支数据以及总开支数据。
-
-
-
-
+![dashboard](https://github.com/user-attachments/assets/850848f6-fc09-45db-a0f9-737358a94507)
 
 2. 查看当前的总开销数据饼状分布图，点击可细分看到每一项的数据。
-
-
+![total](https://github.com/user-attachments/assets/78ef2908-f2a2-4ec0-9acc-985f2c5ce409)
 
 3. 查看对应年份总开销数据直方图，点击可细分看到每一项的数据。
-
-
+![yearly](https://github.com/user-attachments/assets/6e4141c4-1876-476e-823d-85695185c4c7)
 
 4. 查看记账时间线，记录每一项重要节点以及相关信息。
-
-
+![timeline](https://github.com/user-attachments/assets/340c684a-5219-4ecf-85fd-273b84ff654a)
 
 5. 导入excel数据以及导出数据到excel表格中，方便数据迁移。
 
-
-
 6. 自定义你自己的账单分类，让记账数据更个性化。
-
+![setting](https://github.com/user-attachments/assets/c18f7270-131d-4680-9083-9033522f105a)
 
 
 
