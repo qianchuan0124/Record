@@ -33,7 +33,11 @@ export function formatDateByDot(date: Date): string {
 
 // 判断两个Date是否相等，只要年月日相等即可
 export function isSameDate(date1: Date, date2: Date): Boolean {
-    return date1.getFullYear() === date2.getFullYear() &&
-        date1.getMonth() === date2.getMonth() &&
-        date1.getDate() === date2.getDate();
+    const dateLeft = new Date(date1);
+    dateLeft.setHours(0, 0, 0, 0);
+    const dateRight = new Date(date2);
+    dateRight.setHours(0, 0, 0, 0);
+    return dateLeft.getFullYear() === dateRight.getFullYear() &&
+        dateLeft.getMonth() === dateRight.getMonth() &&
+        dateLeft.getDate() === dateRight.getDate();
 }
