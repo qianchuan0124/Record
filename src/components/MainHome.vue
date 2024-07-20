@@ -98,7 +98,6 @@ const tabPosition = ref<TabsInstance["tabPosition"]>("left");
 }
 
 .el-tabs__header {
-  margin-top: 32px;
   margin-right: 0px !important;
   background-color: white;
 }
