@@ -1,13 +1,14 @@
-import { ipcMain } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 import { shell } from "electron";
 import { app, clipboard } from "electron";
 import path from "path";
 import log from "electron-log";
-import { logInfo } from "./Log";
+import { logInfo, logError } from "./Log";
 import { IpcType } from "@/models/IpcResponse";
 import { info } from "@/configs/Info";
+import { openServer } from "./SyncService";
 
-export function settingListener() {
+export function settingListener(win: BrowserWindow) {
     ipcMain.on(IpcType.OPEN_DATABASE_DIR, (event, arg) => {
         logInfo('receive user open database dir')
         shell.openPath(app.getAppPath())
@@ -44,5 +45,15 @@ export function settingListener() {
     ipcMain.on(IpcType.OPEN_URL, (event, url) => {
         logInfo('receive user click url:' + url)
         shell.openExternal(url)
+    })
+
+    ipcMain.handle(IpcType.OPEN_SERVER, async (event, _) => {
+        try {
+            const url = await openServer(win)
+            return url;
+        }
+        catch (error: unknown) {
+            logError("open server failed:" + error);
+        }
     })
 }

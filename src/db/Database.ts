@@ -386,7 +386,6 @@ async function fetchTotalAmount(): Promise<{ income: number; outcome: number }> 
 
 async function updateRecord(record: Record): Promise<number> {
     const { id, date, type, subCategory, category, amount, remark } = record;
-    console.log("update record, record id:" + id);
     if (!id) {
         logError("Record id is empty");
         throw new Error(ErrorType.RECORD_NOT_EXIST);
@@ -680,6 +679,52 @@ async function batchDeleteRecords(ids: number[]) {
 async function fetchAllRecords(): Promise<Record[]> {
     return new Promise((resolve, reject) => {
         db.all("SELECT * FROM record WHERE isDeleted = 0 order by date desc", (err, rows) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(rows as Record[]);
+            }
+        });
+    });
+}
+
+export async function getRecordsCount(): Promise<Number> {
+    return new Promise((resolve, reject) => {
+        db.get("SELECT COUNT(*) as total FROM record WHERE isDeleted = 0", (err, row: any) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(row.total as number);
+            }
+        });
+    })
+}
+
+export async function insertRecordsIfNeeded(records: Record[]): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const sql = "SELECT COUNT(*) as total FROM record WHERE date = ? AND type = ? AND category = ? AND subCategory = ? AND amount = ? AND remark = ?";
+        const stmt = db.prepare(sql);
+        records.forEach((record) => {
+            const dateObj = new Date(record.date);
+            dateObj.setHours(0, 0, 0, 0);
+            const timestamp = dateObj.getTime();
+            stmt.get([timestamp, record.type, record.category, record.subCategory, record.amount, record.remark], (err, row: any) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    if (row.total === 0) {
+                        createRecord(record);
+                    }
+                }
+            });
+        });
+        resolve();
+    });
+}
+
+export async function getRecordsByLimit(limit: Number, offset: Number): Promise<Record[]> {
+    return new Promise((resolve, reject) => {
+        db.all("SELECT * FROM record WHERE isDeleted = 0 order by date desc limit ? offset ?", [limit, offset], (err, rows) => {
             if (err) {
                 reject(err);
             } else {

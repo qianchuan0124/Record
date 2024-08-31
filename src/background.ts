@@ -53,6 +53,7 @@ async function createWindow() {
         win.loadURL('app://./index.html')
     }
     autoUpdateApp(win)
+    settingListener(win)
 }
 
 // Quit when all windows are closed.
@@ -88,7 +89,6 @@ app.on('ready', async () => {
     databaseListen()
     logListener()
     appStatusListener()
-    settingListener()
 })
 
 function appStatusListener() {

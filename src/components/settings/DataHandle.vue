@@ -25,6 +25,14 @@
         </template>
         {{ L10n.export_data }}
       </el-button>
+
+      <div class="data-title sync-data">
+        <span>{{ L10n.sync_data }}</span>
+      </div>
+
+      <el-button type="primary" @click="syncData" class="sync-data-enter">
+        {{ L10n.sync_data }}
+      </el-button>
     </div>
 
     <div class="upload-container">
@@ -118,11 +126,78 @@
           width="260" />
       </el-table>
     </el-dialog>
+
+    <el-dialog v-model="syncDataVisible" witdh="500" height="500">
+      <div v-if="syncType === 'prepare'" class="sync-start-container">
+        <div class="sync-start-left">
+          <span class="sync-title">{{ L10n.sync_data }}</span>
+          <qrcode-vue :value="qrCode" size="300" />
+        </div>
+        <div>
+          <div>
+            <h3>{{ L10n.step_title }}</h3>
+            <div class="setp-content">
+              {{ L10n.step_1 }}
+              <el-link type="primary" @click="clikOuterURL">
+                {{ L10n.download }}
+              </el-link>
+              {{ L10n.step_1_suffix }}
+            </div>
+            <div>
+              <div class="setp-content">{{ L10n.step_2 }}</div>
+              <img
+                src="../../assets/sync-step-1.png"
+                class="sync-step-image"
+                alt="sync" />
+            </div>
+            <div>
+              <div class="setp-content">{{ L10n.step_3 }}</div>
+              <img
+                src="../../assets/sync-step-2.png"
+                class="sync-step-image"
+                alt="sync" />
+            </div>
+            <div class="setp-content">{{ L10n.step_4 }}</div>
+          </div>
+        </div>
+      </div>
+      <div
+        v-else-if="syncType === 'start'"
+        v-loading="true"
+        :element-loading-text="L10n.sync_dataing"
+        :element-loading-svg="svg"
+        class="custom-loading-svg sync-info"
+        element-loading-svg-view-box="-10, -10, 50, 50"></div>
+      <div v-else-if="syncType === 'success'" class="sync-info">
+        <el-result
+          icon="success"
+          :title="L10n.sync_data_success"
+          :sub-title="L10n.sync_data_success_info">
+          <template #extra>
+            <el-button type="primary" @click="syncDataVisible = false">
+              {{ L10n.close }}
+            </el-button>
+          </template>
+        </el-result>
+      </div>
+      <div v-else-if="syncType === 'failed'" class="sync-info">
+        <el-result
+          icon="error"
+          :title="L10n.sync_data_failed"
+          :sub-title="L10n.sync_data_failed_info">
+          <template #extra>
+            <el-button type="primary" @click="syncDataVisible = false">
+              {{ L10n.close }}
+            </el-button>
+          </template>
+        </el-result>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { Check, WarnTriangleFilled } from "@element-plus/icons-vue";
 import {
   ElMessage,
@@ -146,6 +221,10 @@ import * as XLSX from "xlsx";
 import Color from "@/configs/Color.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { logError } from "@/utils/DataCenter";
+import { IpcType } from "@/models/IpcResponse";
+import QrcodeVue from "qrcode.vue";
+import { info } from "@/configs/Info";
+
 const tipVisible = ref(false);
 const tipInfo = ref("");
 const tipType = ref<"export" | "import">("export");
@@ -155,6 +234,40 @@ const importFailedVisible = ref(false);
 const failedData = ref<ImportFailedResult[]>([]);
 const importResult = ref<Boolean | null>(null);
 const upload = ref<UploadInstance>();
+const syncDataVisible = ref(false);
+const qrCode = ref("");
+const syncType = ref<"prepare" | "start" | "success" | "failed">("prepare");
+
+async function syncData() {
+  syncDataVisible.value = true;
+  const url = await window.electron.ipcRenderer.invoke(IpcType.OPEN_SERVER, "");
+  qrCode.value = url;
+}
+
+onMounted(() => {
+  window.electron.ipcRenderer.on(IpcType.SYNC_STATUS, (status) => {
+    if (status === "success") {
+      syncType.value = "success";
+      setTimeout(() => {
+        notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
+      }, 1000);
+    } else if (status == "failed") {
+      syncType.value = "failed";
+    } else if (status == "start") {
+      syncType.value = "start";
+    }
+  });
+});
+
+watch(syncDataVisible, (value) => {
+  if (!value) {
+    syncType.value = "prepare";
+  }
+});
+
+function clikOuterURL() {
+  window.electron.ipcRenderer.send(IpcType.OPEN_URL, info.outerRelease);
+}
 
 function handleChange(file: UploadFile) {
   if (file.raw) {
@@ -245,6 +358,17 @@ async function exportExcel() {
     exportLoading.value = false;
   }
 }
+
+const svg = `
+        <path class="path" d="
+          M 30 15
+          L 28 17
+          M 25.61 25.61
+          A 15 15, 0, 0, 1, 15 30
+          A 15 15, 0, 1, 1, 27.99 7.5
+          L 15 15
+        " style="stroke-width: 4px; fill: rgba(0, 0, 0, 0)"/>
+      `;
 </script>
 
 <style scoped>
@@ -321,5 +445,56 @@ async function exportExcel() {
   font-size: 12px;
   font-weight: 800;
   color: v-bind("Color.delete");
+}
+
+.sync-info {
+  height: 330px;
+}
+
+.sync-start-container {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+}
+
+.sync-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: v-bind("Color.text");
+  margin-bottom: 12px;
+}
+
+.sync-start-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sync-step-image {
+  width: 300px;
+}
+
+.setp-content {
+  font-size: 16px;
+  color: v-bind("Color.text");
+  margin-bottom: 6px;
+  margin-top: 6px;
+}
+
+.el-link {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.sync-data {
+  margin-top: 12px;
+}
+
+.sync-data-enter {
+  width: 210px;
+}
+
+.el-button + .el-button {
+  margin-left: 0px;
 }
 </style>
