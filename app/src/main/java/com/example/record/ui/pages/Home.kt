@@ -35,6 +35,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -221,7 +222,7 @@ fun EditRecordView(record: Record, updateAction: (Record) -> Unit) {
 
     Column(modifier = Modifier.padding(horizontal = 54.dp)) {
         RecordTimeItem(
-            startDate = timeDesc ?: Date(),
+            startDate = timeDesc ?: DateUtils.resetTime(Date()),
             dateChange = { timeDesc = it }
         )
 
@@ -255,9 +256,10 @@ fun EditRecordView(record: Record, updateAction: (Record) -> Unit) {
                 amount = amount
                 remark = record.remark
             },
-            rightTitle = stringResource(R.string.record_create),
+            rightTitle = stringResource(R.string.record_update),
             rightAction = {
                 updateAction(Record(
+                    id = record.id,
                     date = timeDesc ?: Date(),
                     amount = amount?.toFloat() ?: 0.0f,
                     type = if (isIncome) {

@@ -1,7 +1,9 @@
 package com.example.record.ui.components
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -27,6 +29,8 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,8 +53,12 @@ import com.example.record.ui.theme.ColorFailed
 import com.example.record.ui.theme.ColorInfo
 import com.example.record.ui.theme.ColorSuccess
 import com.example.record.utils.CategoryParser
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.map
 
 
+@SuppressLint("FlowOperatorInvokedInComposition")
 @Composable
 fun RecordList(records: List<Record>,
                state: LazyListState,
@@ -57,6 +66,21 @@ fun RecordList(records: List<Record>,
                removeAction: (Record) -> Unit,
                editAction: (Record) -> Unit,
                modifier: Modifier = Modifier) {
+
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    val isFocused by state.interactionSource.interactions
+        .distinctUntilChanged()
+        .filterIsInstance<DragInteraction>()
+        .map { dragInteraction ->
+            dragInteraction is DragInteraction.Start
+        }
+        .collectAsState(false)
+
+    LaunchedEffect(isFocused) {
+        keyboardController?.hide()
+    }
+
     LazyColumn(
         state = state,
         modifier = modifier
@@ -66,7 +90,7 @@ fun RecordList(records: List<Record>,
         itemsIndexed(
             items = records,
             // Provide a unique key based on the email content
-            key = { _, item -> item.hashCode() }
+            key = { _, item -> item.id }
         ) { _, recordContent ->
             // Display each email item
             RecordItem(
@@ -172,13 +196,14 @@ fun RecordItem(
             when(it) {
                 SwipeToDismissBoxValue.StartToEnd -> {
                     showDeleteDialog = true
+                    return@rememberSwipeToDismissBoxState false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
                     showEditDialog = true
+                    return@rememberSwipeToDismissBoxState false
                 }
                 SwipeToDismissBoxValue.Settled -> return@rememberSwipeToDismissBoxState false
             }
-            confirmResult
         },
         // positional threshold of 45%
         positionalThreshold = { it * .45f }
@@ -199,17 +224,8 @@ fun RecordItem(
     }
 
     if (showEditDialog) {
-        ActionDialog(
-            title = stringResource(R.string.update_record_dialog),
-            content = stringResource(R.string.confirm_update_record),
-            onConfirmAction = {
-                showEditDialog = false
-                confirmResult = true
-                onEdit(currentItem)
-            }) {
-            showEditDialog = false
-            confirmResult = false
-        }
+        onEdit(currentItem)
+        showEditDialog = false
     }
 
     SwipeToDismissBox(

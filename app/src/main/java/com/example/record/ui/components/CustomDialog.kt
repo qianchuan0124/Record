@@ -48,7 +48,7 @@ fun BudgetDialog(
     }
 
     var selectedCategory by rememberSaveable {
-        mutableStateOf(budget?.category ?: CategoryParser.firstCategory())
+        mutableStateOf(budget?.category ?: CategoryParser.firstLevelCategories().first { !disabledCategory.contains(it) })
     }
 
     val focusRequester = remember { FocusRequester() }
@@ -56,7 +56,7 @@ fun BudgetDialog(
     CustomDialog(
         content = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = "分类: ")
+                Text(text = stringResource(R.string.budget_category_title))
                 Box {
                     FilterChip(
                         selected = true,
@@ -85,7 +85,7 @@ fun BudgetDialog(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(top = 16.dp)
             ) {
-                Text(text = "预算: ")
+                Text(text = stringResource(R.string.budget_sumary_title))
                 AmountTextEdit(
                     innerAmount = amount,
                     modifier = Modifier.focusRequester(focusRequester)

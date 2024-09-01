@@ -54,12 +54,20 @@ object DateUtils {
 
         // 获取第一天
         calendar.set(Calendar.DAY_OF_MONTH, 1)
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
         val firstDay = calendar.time
 
         // 获取最后一天
         calendar.add(Calendar.MONTH, 1)
         calendar.set(Calendar.DAY_OF_MONTH, 1)
         calendar.add(Calendar.DAY_OF_MONTH, -1)
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
         val lastDay = calendar.time
 
         return Pair(firstDay, lastDay)
@@ -74,6 +82,23 @@ object DateUtils {
         val latestTimestamp = calendar.timeInMillis
 
         return Pair(Date(earliestTimestamp), Date(latestTimestamp))
+    }
+
+    fun resetTime(date: Date?): Date {
+        val calendar = Calendar.getInstance()
+        calendar.time = date ?: Date()
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.time
+    }
+
+    fun isDateInRange(targetDate: Date?, startDate: Date, endDate: Date): Boolean {
+        targetDate?.let {
+            return !it.before(startDate) && !it.after(endDate)
+        }
+        return false
     }
 
     fun debugDateRange(): Pair<Date, Date> {

@@ -51,6 +51,7 @@ import com.example.record.ui.theme.ColorSubInfo
 import com.example.record.ui.theme.ColorSuccess
 import com.example.record.ui.theme.ColorTitle
 import com.example.record.utils.CategoryParser
+import com.example.record.utils.DateUtils
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -87,7 +88,7 @@ fun AddRecordView(addAction: (Record) -> Unit) {
         BottomActionView(
             leftTitle = stringResource(R.string.record_reset),
             leftAction = {
-                timeDesc = Date()
+                timeDesc = DateUtils.resetTime(Date())
                 isIncome = false
                 firstCategory = CategoryParser.firstCategory()
                 secondCategory = CategoryParser.firstChildCategory()
@@ -97,7 +98,8 @@ fun AddRecordView(addAction: (Record) -> Unit) {
             rightTitle = stringResource(R.string.record_create),
             rightAction = {
                 addAction(Record(
-                    date = timeDesc ?: Date(),
+                    id = 0,
+                    date = DateUtils.resetTime(timeDesc ?: Date()),
                     amount = amount?.toFloat() ?: 0f,
                     type = if (isIncome) context.getString(R.string.record_income) else context.getString(R.string.record_outcome),
                     category = firstCategory,
@@ -131,7 +133,7 @@ fun RecordActionItem(title: String, modifier: Modifier = Modifier, content: @Com
 }
 
 @Composable
-fun RecordTimeItem(startDate: Date = Date(),
+fun RecordTimeItem(startDate: Date = DateUtils.resetTime(Date()),
                    dateChange: (Date?) -> Unit
 ) {
     val showTimePicker = remember { mutableStateOf(false) }
@@ -149,8 +151,10 @@ fun RecordTimeItem(startDate: Date = Date(),
     }
     if (showTimePicker.value) {
         DatePickerModal(onDateSelected = {
-            timeDesc = it.dateToString()
-            dateChange(it)
+            it?.let { date ->
+                timeDesc = date.dateToString()
+                dateChange(DateUtils.resetTime(date))
+            }
         }, onDismiss = {
             showTimePicker.value = false
         })
@@ -334,6 +338,7 @@ fun RecordRemarkItem(remark: String = "", changed: (String) -> Unit) {
                             .size(width = 16.dp, height = 16.dp)
                             .clickable {
                                 innerRemark = ""
+                                changed(innerRemark)
                             }
                     )
                 }
@@ -453,7 +458,7 @@ fun RecordFilterCategoryItem(
 }
 
 fun Pair<Long?, Long?>.timeToDate(): Pair<Date?, Date?> {
-    return Pair(this.first?.let { Date(it) }, this.second?.let { Date(it) })
+    return Pair(this.first?.let { DateUtils.resetTime(Date(it)) }, this.second?.let { DateUtils.resetTime(Date(it)) })
 }
 
 @Composable

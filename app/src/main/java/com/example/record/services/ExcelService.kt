@@ -57,7 +57,7 @@ object ExcelService {
                 )
             )
 
-            database.record().queryAll().forEach { record ->
+            database.record().queryAll().sortedByDescending { it.date }.forEach { record ->
                 val rowData = arrayOf(
                     DateUtils.formatDate(record.date),
                     record.type,

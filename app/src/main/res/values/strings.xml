@@ -78,4 +78,7 @@
     <string name="request_camera_permission">需要相机权限</string>
     <string name="give_permission">授予权限</string>
     <string name="reject_permission">拒绝权限</string>
+    <string name="record_update">更新</string>
+    <string name="budget_category_title">"分类: "</string>
+    <string name="budget_sumary_title">"预算: "</string>
 </resources>

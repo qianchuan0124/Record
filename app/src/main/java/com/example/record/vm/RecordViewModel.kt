@@ -11,6 +11,7 @@ import com.example.record.R
 import com.example.record.model.Database
 import com.example.record.model.Filter
 import com.example.record.model.Record
+import com.example.record.model.RecordError
 import com.example.record.services.NotificationReceiver
 import com.example.record.services.NotifyCenter
 import com.example.record.services.NotifyType
@@ -178,9 +179,18 @@ class RecordViewModel: ViewModel() {
                     addRecord(newItem)
                 }
                 _recordsState.update {
-                    val mutableList = it.toMutableList()
-                    mutableList.add(newItem)
-                    mutableList
+                    if (DateUtils.isDateInRange(newItem.date, _filterState.value.startDate, _filterState.value.endDate)) {
+                        val mutableList = it.toMutableList()
+                        val index = mutableList.indexOfFirst { item -> item.date?.before(newItem.date) ?: false }
+                        if (index >= 0) {
+                            mutableList.add(index, newItem)
+                        } else {
+                            mutableList.add(0, newItem)
+                        }
+                        mutableList
+                    } else {
+                        it
+                    }
                 }
                 NotifyCenter.sendRecordNotify(NotifyType.RecordAdd)
                 reloadData()
@@ -200,8 +210,12 @@ class RecordViewModel: ViewModel() {
                 _recordsState.update {
                     val mutableList = it.toMutableList()
                     val index = mutableList.indexOfFirst { sub -> sub.id == currentItem.id }
-                    mutableList[index] = currentItem
-                    mutableList
+                    if (index == -1) {
+                        throw RecordError(message = "找不到记录")
+                    } else {
+                        mutableList[index] = currentItem
+                        mutableList.filter { item -> DateUtils.isDateInRange(item.date, _filterState.value.startDate, _filterState.value.endDate) }.sortedByDescending { item -> item.date }
+                    }
                 }
                 NotifyCenter.sendRecordNotify(NotifyType.RecordUpdate)
                 loadTotalInfo()
