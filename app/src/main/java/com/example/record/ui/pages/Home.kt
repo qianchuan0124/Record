@@ -351,25 +351,11 @@ fun RecordContainer(records: List<Record>,
                     clearAction: () -> Unit,
                     filterAction: () -> Unit) {
 
-    var showSyncPage by rememberSaveable {
-        mutableStateOf(false)
-    }
-
     Column(modifier = Modifier.fillMaxSize()) {
         Row(horizontalArrangement = Arrangement.SpaceEvenly) {
             Text(
                 text = stringResource(R.string.record_list),
                 modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
-                color = ColorTitle,
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = stringResource(R.string.record_sync),
-                modifier = Modifier
-                    .padding(horizontal = 28.dp, vertical = 24.dp)
-                    .clickable { showSyncPage = true },
                 color = ColorTitle,
                 fontSize = 21.sp,
                 fontWeight = FontWeight.Bold
@@ -425,12 +411,6 @@ fun RecordContainer(records: List<Record>,
             RecordEmptyView(modifier = Modifier.padding(top = 24.dp))
         } else {
             RecordList(records, state, searchKey, removeAction, editAction)
-        }
-
-        if (showSyncPage) {
-            SyncDataView {
-                showSyncPage = false
-            }
         }
     }
 }
