@@ -361,15 +361,15 @@ fun RecordContainer(records: List<Record>,
                 fontWeight = FontWeight.Bold
             )
 
-            Text(
-                text = stringResource(R.string.record_clear),
-                modifier = Modifier
-                    .padding(horizontal = 28.dp, vertical = 24.dp)
-                    .clickable { clearAction() },
-                color = ColorTitle,
-                fontSize = 21.sp,
-                fontWeight = FontWeight.Bold
-            )
+//            Text(
+//                text = stringResource(R.string.record_clear),
+//                modifier = Modifier
+//                    .padding(horizontal = 28.dp, vertical = 24.dp)
+//                    .clickable { clearAction() },
+//                color = ColorTitle,
+//                fontSize = 21.sp,
+//                fontWeight = FontWeight.Bold
+//            )
         }
 
         Row(
