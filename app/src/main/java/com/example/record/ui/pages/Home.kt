@@ -253,7 +253,7 @@ fun EditRecordView(record: Record, updateAction: (Record) -> Unit) {
                 isIncome = record.type == context.getString(R.string.record_income)
                 firstCategory = record.category
                 secondCategory = record.subCategory
-                amount = amount
+                amount = record.amount.toString()
                 remark = record.remark
             },
             rightTitle = stringResource(R.string.record_update),
@@ -312,11 +312,11 @@ fun FilterRecordView(filter: Filter, dismiss: () -> Unit, filterAction: (Filter)
         )
 
         BottomActionView(
-            leftTitle = stringResource(R.string.record_total),
+            leftTitle = stringResource(R.string.record_reset),
             leftAction = {
-                timeSelectRange = Pair(null, null)
+                timeSelectRange = DateUtils.currentMonthDateRange()
                 typeFilter = Pair(null, null)
-                categoryFilter = arrayOf()
+                categoryFilter = CategoryParser.filterCheckBoxInfo(filter.copy(subCategories = listOf()))
             },
             rightTitle = stringResource(R.string.record_filter),
             rightAction = {

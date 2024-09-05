@@ -121,6 +121,7 @@ object RecordSyncService: CoroutineScope {
         database.withTransaction {
             val batchSize = 100
             val batches = records.chunked(batchSize)
+            var skip = 0
             try {
                 batches.forEach { batch ->
                     batch.forEach { record ->
@@ -138,11 +139,12 @@ object RecordSyncService: CoroutineScope {
                                 Log.d(LogTag.SyncRecord, "插入数据: $record")
                             } else {
                                 Log.d(LogTag.SyncRecord, "发现重复数据: $record")
+                                skip += 1
                             }
                         }
                     }
-                    Log.d(LogTag.SyncRecord, "插入成功, 数量: ${batch.size}")
                 }
+                Log.d(LogTag.SyncRecord, "插入成功, 数量: ${records.size} skip: $skip")
             } catch (e: Exception) {
                 // 处理异常，例如记录日志或向用户显示错误消息
                 Log.e(LogTag.SyncRecord, "插入数据失败", e)

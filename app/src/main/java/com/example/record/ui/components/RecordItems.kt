@@ -1,7 +1,9 @@
 package com.example.record.ui.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,13 +31,17 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,7 +64,7 @@ import java.util.Locale
 
 @Composable
 fun AddRecordView(addAction: (Record) -> Unit) {
-    var timeDesc by rememberSaveable { mutableStateOf<Date?>(Date()) }
+    var timeDesc by rememberSaveable { mutableStateOf(Date()) }
     var isIncome by rememberSaveable { mutableStateOf(false) }
     var firstCategory by rememberSaveable { mutableStateOf(CategoryParser.firstCategory()) }
     var secondCategory by rememberSaveable { mutableStateOf(CategoryParser.firstChildCategory()) }
@@ -67,6 +73,7 @@ fun AddRecordView(addAction: (Record) -> Unit) {
 
     Column(modifier = Modifier.padding(horizontal = 54.dp)) {
         RecordTimeItem(
+            startDate = timeDesc,
             dateChange = { timeDesc = it }
         )
 
@@ -74,14 +81,17 @@ fun AddRecordView(addAction: (Record) -> Unit) {
             isIncome = it
         })
 
-        RecordCategoryItem(changed = { first, second ->
-            firstCategory = first
-            secondCategory = second
-        })
+        RecordCategoryItem(
+            firstCategory,
+            secondCategory,
+            changed = { first, second ->
+                firstCategory = first
+                secondCategory = second
+            })
 
         RecordAmountItem(amount, changed = { amount = it })
 
-        var remark by rememberSaveable{ mutableStateOf("") }
+        var remark by rememberSaveable { mutableStateOf("") }
 
         RecordRemarkItem(remark, changed = { remark = it })
 
@@ -134,10 +144,14 @@ fun RecordActionItem(title: String, modifier: Modifier = Modifier, content: @Com
 
 @Composable
 fun RecordTimeItem(startDate: Date = DateUtils.resetTime(Date()),
-                   dateChange: (Date?) -> Unit
+                   dateChange: (Date) -> Unit
 ) {
     val showTimePicker = remember { mutableStateOf(false) }
     var timeDesc by rememberSaveable { mutableStateOf(startDate.dateToString()) }
+
+    LaunchedEffect(startDate) {
+        timeDesc = startDate.dateToString()
+    }
 
     RecordActionItem(title = stringResource(R.string.time)) {
         FilterChip(
@@ -166,6 +180,11 @@ fun RecordTypeItem(isIncome: Boolean = false,
                    selectChange: (Boolean) -> Unit
 ) {
     var innerIsIncome by rememberSaveable { mutableStateOf(isIncome) }
+
+    LaunchedEffect(isIncome) {
+        innerIsIncome = isIncome
+    }
+
     RecordActionItem(title = stringResource(R.string.type)) {
         FilterChip(
             selected = !innerIsIncome,
@@ -223,6 +242,11 @@ fun RecordCategoryItem(
     var firstCategory by rememberSaveable { mutableStateOf(firstInitCategory) }
     var secondCategory by rememberSaveable { mutableStateOf(secondInitCategory) }
 
+    LaunchedEffect(firstInitCategory, secondInitCategory) {
+        firstCategory = firstInitCategory
+        secondCategory = secondInitCategory
+    }
+
     RecordActionItem(title = stringResource(R.string.category)) {
         FilterChip(
             selected = true,
@@ -270,6 +294,10 @@ fun RecordAmountItem(
     changed: (String?) -> Unit
 ) {
     var innerAmount by rememberSaveable{ mutableStateOf(amount) }
+
+    LaunchedEffect(amount) {
+        innerAmount = amount
+    }
 
     RecordActionItem(title = stringResource(R.string.amount)) {
         AmountTextEdit(innerAmount = innerAmount) {
@@ -319,6 +347,10 @@ fun AmountTextEdit(innerAmount: String?, modifier: Modifier = Modifier, changed:
 fun RecordRemarkItem(remark: String = "", changed: (String) -> Unit) {
     var innerRemark by rememberSaveable{ mutableStateOf("") }
 
+    LaunchedEffect(remark) {
+        innerRemark = remark
+    }
+
     RecordActionItem(title = stringResource(R.string.remark), modifier = Modifier.padding(top = 12.dp)) {
         CustomTextField(
             value = remark, onValueChange = {
@@ -363,6 +395,11 @@ fun RecordTimeRangeItem(
         mutableStateOf(false)
     }
     var timeDesc by rememberSaveable { mutableStateOf(Pair(startDate, endDate)) }
+
+    LaunchedEffect(startDate) {
+        timeDesc = Pair(startDate, endDate)
+    }
+
     RecordActionItem(title = stringResource(R.string.time)) {
         FilterChip(selected = true, onClick = {
             showTimePicker = true
@@ -389,6 +426,15 @@ fun RecordFilterTypeItem(
 ) {
     var innerOutcome by rememberSaveable { mutableStateOf(outcome ?: false) }
     var innerIncome by rememberSaveable { mutableStateOf(income ?: false) }
+
+    LaunchedEffect(outcome) {
+        innerOutcome = outcome ?: false
+    }
+
+    LaunchedEffect(income) {
+        innerIncome = income ?: false
+    }
+
     RecordActionItem(title = stringResource(R.string.type)) {
         FilterChip(
             selected = innerOutcome, onClick = {
@@ -440,20 +486,54 @@ fun RecordFilterCategoryItem(
         mutableStateOf(false)
     }
 
-    RecordActionItem(title = stringResource(R.string.category)) {
-        FilterChip(selected = true, onClick = {
-            showCategoryPicker = true
-        }, label = {
-            Text(stringResource(R.string.select_category))
-        })
+    var selectedCount by rememberSaveable {
+        val count = initCheckboxes.flatMap { it.subCheckBoxes.asList() }.count { it.isChecked }
+        mutableIntStateOf(count)
     }
+
+    LaunchedEffect(initCheckboxes) {
+        selectedCount = initCheckboxes.flatMap { it.subCheckBoxes.asList() }.count { it.isChecked }
+    }
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RecordActionItem(title = stringResource(R.string.category), modifier = Modifier.padding(end = 12.dp)) {
+            FilterChip(selected = true, onClick = {
+                showCategoryPicker = true
+            }, label = {
+                Text(stringResource(R.string.select_category))
+            })
+        }
+
+        if (selectedCount > 0) {
+            HollowCircleWithNumber(number = selectedCount)
+        }
+    }
+
 
     if (showCategoryPicker) {
         MultiCheckboxesModal(items = initCheckboxes, confirmAction = {
             changed(it)
+            selectedCount = it.flatMap { sub -> sub.subCheckBoxes.asList() }.count { sub -> sub.isChecked }
         }) {
             showCategoryPicker = false
         }
+    }
+}
+
+@Composable
+fun HollowCircleWithNumber(number: Int) {
+    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(26.dp)) {
+        // 绘制空心圆
+        Canvas(modifier = Modifier.matchParentSize()) {
+            drawCircle(
+                color = ColorSuccess,
+                center = Offset(size.width / 2, size.height / 2),
+                radius = size.minDimension / 2,
+                style = Stroke(width = 2.dp.toPx()) // 设置Stroke来绘制空心效果
+            )
+        }
+        // 显示数字
+        Text(text = number.toString(), fontSize = 14.sp, color = ColorTitle)
     }
 }
 
