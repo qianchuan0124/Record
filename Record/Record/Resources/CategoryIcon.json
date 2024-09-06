@@ -1,0 +1,330 @@
+{
+  "default": [
+    {
+      "value": "餐饮",
+      "icon": "food_icon",
+      "children": [
+        {
+          "value": "三餐",
+          "icon": "food_icon"
+        },
+        {
+          "value": "早餐",
+          "icon": "breakfast_icon"
+        },
+        {
+          "value": "中餐",
+          "icon": "food_icon"
+        },
+        {
+          "value": "晚餐",
+          "icon": "food_icon"
+        },
+        {
+          "value": "买菜",
+          "icon": "vegatables_icon"
+        },
+        {
+          "value": "水果",
+          "icon": "fruit_icon"
+        },
+        {
+          "value": "零食",
+          "icon": "snacks_icon"
+        },
+        {
+          "value": "加餐",
+          "icon": "food_icon"
+        },
+        {
+          "value": "下午茶",
+          "icon": "afternoon_tea_icon"
+        },
+        {
+          "value": "烟酒饮品",
+          "icon": "drink_icon"
+        },
+        {
+          "value": "粮油调料",
+          "icon": "food_icon"
+        }
+      ]
+    },
+    {
+      "value": "交通",
+      "icon": "traffic_icon",
+      "children": [
+        {
+          "value": "公交地铁",
+          "icon": "subway_icon"
+        },
+        {
+          "value": "打车",
+          "icon": "taxi_icon"
+        },
+        {
+          "value": "火车飞机",
+          "icon": "plane_train_icon"
+        },
+        {
+          "value": "共享单车",
+          "icon": "traffic_icon"
+        },
+        {
+          "value": "私家车",
+          "icon": "traffic_icon"
+        }
+      ]
+    },
+    {
+      "value": "购物",
+      "icon": "shopping_icon",
+      "children": [
+        {
+          "value": "日用品",
+          "icon": "goods_icon"
+        },
+        {
+          "value": "衣帽鞋包",
+          "icon": "clothes_icon"
+        },
+        {
+          "value": "护肤美妆",
+          "icon": "shopping_icon"
+        },
+        {
+          "value": "饰品",
+          "icon": "shopping_icon"
+        },
+        {
+          "value": "数码",
+          "icon": "digital_icon"
+        },
+        {
+          "value": "电器",
+          "icon": "electrical_icon"
+        },
+        {
+          "value": "家装",
+          "icon": "shopping_icon"
+        }
+      ]
+    },
+    {
+      "value": "居家",
+      "icon": "home_icon",
+      "children": [
+        {
+          "value": "话费",
+          "icon": "phone_bill_icon"
+        },
+        {
+          "value": "房租",
+          "icon": "home_bill_icon"
+        },
+        {
+          "value": "水费",
+          "icon": "water_bill_icon"
+        },
+        {
+          "value": "电费",
+          "icon": "electricity_bill_icon"
+        },
+        {
+          "value": "物业",
+          "icon": "home_icon"
+        },
+        {
+          "value": "维修",
+          "icon": "fix_icon"
+        },
+        {
+          "value": "管理费",
+          "icon": "home_icon"
+        },
+        {
+          "value": "网费",
+          "icon": "home_icon"
+        },
+        {
+          "value": "燃气费",
+          "icon": "gas_icon"
+        }
+      ]
+    },
+    {
+      "value": "人情",
+      "icon": "relationship_icon",
+      "children": [
+        {
+          "value": "送礼",
+          "icon": "gift_icon"
+        },
+        {
+          "value": "请客",
+          "icon": "treat_icon"
+        },
+        {
+          "value": "孝心",
+          "icon": "relationship_icon"
+        },
+        {
+          "value": "亲密付",
+          "icon": "relationship_icon"
+        },
+        {
+          "value": "发红包",
+          "icon": "red_packet_icon"
+        },
+        {
+          "value": "借出",
+          "icon": "relationship_icon"
+        },
+        {
+          "value": "还钱",
+          "icon": "relationship_icon"
+        }
+      ]
+    },
+    {
+      "value": "医疗",
+      "icon": "medical_icon",
+      "children": [
+        {
+          "value": "药品",
+          "icon": "medical_icon"
+        },
+        {
+          "value": "保健",
+          "icon": "medical_icon"
+        },
+        {
+          "value": "治疗",
+          "icon": "medical_icon"
+        },
+        {
+          "value": "美容",
+          "icon": "haircut_icon"
+        }
+      ]
+    },
+    {
+      "value": "娱乐",
+      "icon": "entertainment_icon",
+      "children": [
+        {
+          "value": "电子消费",
+          "icon": "member_icon"
+        },
+        {
+          "value": "休闲",
+          "icon": "leisure_icon"
+        },
+        {
+          "value": "约会",
+          "icon": "dating_icon"
+        },
+        {
+          "value": "聚会",
+          "icon": "party_icon"
+        },
+        {
+          "value": "游戏",
+          "icon": "game_icon"
+        },
+        {
+          "value": "健身",
+          "icon": "entertainment_icon"
+        },
+        {
+          "value": "电影",
+          "icon": "movie_icon"
+        }
+      ]
+    },
+    {
+      "value": "学习",
+      "icon": "study_icon",
+      "children": [
+        {
+          "value": "ChatGPT",
+          "icon": "chatgpt_icon"
+        },
+        {
+          "value": "书籍",
+          "icon": "study_icon"
+        },
+        {
+          "value": "培训",
+          "icon": "study_icon"
+        },
+        {
+          "value": "网课",
+          "icon": "study_icon"
+        }
+      ]
+    },
+    {
+      "value": "金融",
+      "icon": "finance_icon",
+      "children": [
+        {
+          "value": "房贷",
+          "icon": "finance_icon"
+        },
+        {
+          "value": "车贷",
+          "icon": "finance_icon"
+        },
+        {
+          "value": "分期",
+          "icon": "finance_icon"
+        },
+        {
+          "value": "手续费",
+          "icon": "finance_icon"
+        },
+        {
+          "value": "保险",
+          "icon": "finance_icon"
+        },
+        {
+          "value": "养卡",
+          "icon": "finance_icon"
+        }
+      ]
+    },
+    {
+      "value": "快递",
+      "icon": "express_icon",
+      "children": [
+        {
+          "value": "快递到付",
+          "icon": "express_icon"
+        },
+        {
+          "value": "邮寄快递",
+          "icon": "express_icon"
+        }
+      ]
+    },
+    {
+      "value": "其他",
+      "icon": "other_icon",
+      "children": [
+        {
+          "value": "旅游",
+          "icon": "travelling_icon"
+        },
+        {
+          "value": "装修",
+          "icon": "other_icon"
+        },
+        {
+          "value": "办事",
+          "icon": "other_icon"
+        }
+      ]
+    }
+  ]
+}

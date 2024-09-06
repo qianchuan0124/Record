@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="46" height="188" viewBox="0 0 46 188" fill="none">
+<path     fill="url(#linear_fill_20_1_0)"  d="M0 172L0 16C0 7.16344 7.16344 0 16 0L30 0C38.8366 0 46 7.16344 46 16L46 172C46 180.837 38.8366 188 30 188L16 188C7.16344 188 0 180.837 0 172Z">
+</path>
+<path d="M29 95L24 95L24 100C24 100.55 23.55 101 23 101C22.45 101 22 100.55 22 100L22 95L17 95C16.45 95 16 94.55 16 94C16 93.45 16.45 93 17 93L22 93L22 88C22 87.45 22.45 87 23 87C23.55 87 24 87.45 24 88L24 93L29 93C29.55 93 30 93.45 30 94C30 94.55 29.55 95 29 95Z"   fill="#FFFFFF" >
+</path>
+<defs>
+<radialGradient id="linear_fill_20_1_0" cx="0" cy="0" r="1" gradientTransform="translate(12.2222238779068 37.13841366767883) rotate(-198.81677138782157) scale(170.74393851048234, 127.45942053756447)" gradientUnits="userSpaceOnUse">
+<stop offset="0" stop-color="#494B4E"  />
+<stop offset="1" stop-color="#1D2027"  />
+</radialGradient>
+</defs>
+</svg>

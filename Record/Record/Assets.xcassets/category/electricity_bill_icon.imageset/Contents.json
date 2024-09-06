@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "electricity_bill_icon.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

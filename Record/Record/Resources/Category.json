@@ -1,0 +1,330 @@
+{
+  "default": [
+    {
+      "label": "餐饮",
+      "value": "food",
+      "children": [
+        {
+          "value": "三餐",
+          "label": "三餐"
+        },
+        {
+          "value": "早餐",
+          "label": "早餐"
+        },
+        {
+          "value": "中餐",
+          "label": "中餐"
+        },
+        {
+          "value": "晚餐",
+          "label": "晚餐"
+        },
+        {
+          "value": "买菜",
+          "label": "买菜"
+        },
+        {
+          "value": "水果",
+          "label": "水果"
+        },
+        {
+          "value": "零食",
+          "label": "零食"
+        },
+        {
+          "value": "加餐",
+          "label": "加餐"
+        },
+        {
+          "value": "下午茶",
+          "label": "下午茶"
+        },
+        {
+          "value": "烟酒饮品",
+          "label": "烟酒饮品"
+        },
+        {
+          "value": "粮油调料",
+          "label": "粮油调料"
+        }
+      ]
+    },
+    {
+      "label": "交通",
+      "value": "traffic",
+      "children": [
+        {
+          "value": "公交地铁",
+          "label": "公交地铁"
+        },
+        {
+          "value": "打车",
+          "label": "打车"
+        },
+        {
+          "value": "火车飞机",
+          "label": "火车飞机"
+        },
+        {
+          "value": "共享单车",
+          "label": "共享单车"
+        },
+        {
+          "value": "私家车",
+          "label": "私家车"
+        }
+      ]
+    },
+    {
+      "label": "购物",
+      "value": "shopping",
+      "children": [
+        {
+          "value": "日用品",
+          "label": "日用品"
+        },
+        {
+          "value": "衣帽鞋包",
+          "label": "衣帽鞋包"
+        },
+        {
+          "value": "护肤美妆",
+          "label": "护肤美妆"
+        },
+        {
+          "value": "饰品",
+          "label": "饰品"
+        },
+        {
+          "value": "数码",
+          "label": "数码"
+        },
+        {
+          "value": "电器",
+          "label": "电器"
+        },
+        {
+          "value": "家装",
+          "label": "家装"
+        }
+      ]
+    },
+    {
+      "label": "居家",
+      "value": "home",
+      "children": [
+        {
+          "value": "话费",
+          "label": "话费"
+        },
+        {
+          "value": "房租",
+          "label": "房租"
+        },
+        {
+          "value": "水费",
+          "label": "水费"
+        },
+        {
+          "value": "电费",
+          "label": "电费"
+        },
+        {
+          "value": "物业",
+          "label": "物业"
+        },
+        {
+          "value": "维修",
+          "label": "维修"
+        },
+        {
+          "value": "管理费",
+          "label": "管理费"
+        },
+        {
+          "value": "网费",
+          "label": "网费"
+        },
+        {
+          "value": "燃气费",
+          "label": "燃气费"
+        }
+      ]
+    },
+    {
+      "label": "人情",
+      "value": "relationship",
+      "children": [
+        {
+          "value": "送礼",
+          "label": "送礼"
+        },
+        {
+          "value": "请客",
+          "label": "请客"
+        },
+        {
+          "value": "孝心",
+          "label": "孝心"
+        },
+        {
+          "value": "亲密付",
+          "label": "亲密付"
+        },
+        {
+          "value": "发红包",
+          "label": "发红包"
+        },
+        {
+          "value": "借出",
+          "label": "借出"
+        },
+        {
+          "value": "还钱",
+          "label": "还钱"
+        }
+      ]
+    },
+    {
+      "label": "医疗",
+      "value": "medical",
+      "children": [
+        {
+          "value": "药品",
+          "label": "药品"
+        },
+        {
+          "value": "保健",
+          "label": "保健"
+        },
+        {
+          "value": "治疗",
+          "label": "治疗"
+        },
+        {
+          "value": "美容",
+          "label": "美容"
+        }
+      ]
+    },
+    {
+      "label": "娱乐",
+      "value": "entertainment",
+      "children": [
+        {
+          "value": "电子消费",
+          "label": "电子消费"
+        },
+        {
+          "value": "休闲",
+          "label": "休闲"
+        },
+        {
+          "value": "约会",
+          "label": "约会"
+        },
+        {
+          "value": "聚会",
+          "label": "聚会"
+        },
+        {
+          "value": "游戏",
+          "label": "游戏"
+        },
+        {
+          "value": "健身",
+          "label": "健身"
+        },
+        {
+          "value": "电影",
+          "label": "电影"
+        }
+      ]
+    },
+    {
+      "label": "学习",
+      "value": "study",
+      "children": [
+        {
+          "value": "ChatGPT",
+          "label": "ChatGPT"
+        },
+        {
+          "value": "书籍",
+          "label": "书籍"
+        },
+        {
+          "value": "培训",
+          "label": "培训"
+        },
+        {
+          "value": "网课",
+          "label": "网课"
+        }
+      ]
+    },
+    {
+      "label": "金融",
+      "value": "finance",
+      "children": [
+        {
+          "value": "房贷",
+          "label": "房贷"
+        },
+        {
+          "value": "车贷",
+          "label": "车贷"
+        },
+        {
+          "value": "分期",
+          "label": "分期"
+        },
+        {
+          "value": "手续费",
+          "label": "手续费"
+        },
+        {
+          "value": "保险",
+          "label": "保险"
+        },
+        {
+          "value": "养卡",
+          "label": "养卡"
+        }
+      ]
+    },
+    {
+      "label": "快递",
+      "value": "express",
+      "children": [
+        {
+          "value": "快递到付",
+          "label": "快递到付"
+        },
+        {
+          "value": "邮寄快递",
+          "label": "邮寄快递"
+        }
+      ]
+    },
+    {
+      "label": "其他",
+      "value": "other",
+      "children": [
+        {
+          "value": "旅游",
+          "label": "旅游"
+        },
+        {
+          "value": "装修",
+          "label": "装修"
+        },
+        {
+          "value": "办事",
+          "label": "办事"
+        }
+      ]
+    }
+  ]
+}
