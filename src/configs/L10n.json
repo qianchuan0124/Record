@@ -127,5 +127,8 @@
   "sync_data_failed": "同步失败",
   "sync_data_success_info": "数据同步成功!",
   "sync_data_failed_info": "数据同步失败!",
-  "close": "关闭"
+  "close": "关闭",
+  "moblie_client": "移动端",
+  "andorid_download": "Android扫码直接下载",
+  "ios_download": "iOS扫码前往代码仓库"
 }
