@@ -29,14 +29,21 @@ CSV文件导入与导出 - 原生能力
 ## 主要功能
 
 1. 查看总收入与本月具体记账数据、新增记账数据、左滑删除记录、右滑更新记录、过滤相关记录、查询相关记录。
-![ios_home](https://github.com/user-attachments/assets/41fdce29-6583-42ff-9e0d-2a1b7f4c68d8)
+
+![ios_home_compressed](https://github.com/user-attachments/assets/6270da8b-1b14-445a-a1b8-0a8bbcb4a881)
+
 
 2. 查看近五年支出记录数据及统计饼状图，点击饼状图区域查看具体年份的支出详细信息。
 
-![ios_analysis](https://github.com/user-attachments/assets/4babda65-523c-42cd-8d1b-ae227366590c)
+![ios_analysis_compressed](https://github.com/user-attachments/assets/41f5037e-a197-4e34-89b1-721ebd18b718)
+
 
 3. 查看本月的具体花费，自定义预算计划，查看当前的预算进度。
-![ios_budget](https://github.com/user-attachments/assets/71bd93a1-ae6b-408a-9da0-f6b5318a9c05)
+
+![ios_budget_compressed](https://github.com/user-attachments/assets/8f5fa1cb-2435-4ac1-a2f2-ac1abe8c844f)
+
 
 4. 将数据从Excel表格中导入、将数据导出到Excel表格中、和电脑端同步记账数据
-![ios_setting](https://github.com/user-attachments/assets/26121b9d-7064-4d2f-a562-c91029e380af)
+
+![ios_setting_compressed](https://github.com/user-attachments/assets/c630742b-e8b4-4bc1-b26c-5a7f548e231e)
+
