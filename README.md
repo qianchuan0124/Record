@@ -33,6 +33,8 @@
 6. 自定义你自己的账单分类，让记账数据更个性化。
 ![setting](https://github.com/user-attachments/assets/c18f7270-131d-4680-9083-9033522f105a)
 
+7. 与移动端同步数据(暂electron 桌面版支持)。
+![sync-data](https://github.com/user-attachments/assets/7f8af174-3e3d-408a-8024-f29941de7be4)
 
 
 
