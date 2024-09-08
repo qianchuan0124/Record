@@ -77,7 +77,7 @@ interface RecordDao {
 @Entity
 data class Record(
     @PrimaryKey(autoGenerate = true)
-    val id: Int,
+    var id: Int = 0,
     val date: Date? = null,
     val amount: Float,
     val type: String,

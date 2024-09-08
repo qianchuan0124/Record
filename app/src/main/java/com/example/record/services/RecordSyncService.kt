@@ -135,6 +135,7 @@ object RecordSyncService: CoroutineScope {
                                 record.remark
                             )
                             if (duplicate == null) {
+                                record.id = 0
                                 recordDao.insert(record)
                                 Log.d(LogTag.SyncRecord, "插入数据: $record")
                             } else {
