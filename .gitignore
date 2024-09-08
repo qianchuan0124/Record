@@ -2,7 +2,6 @@
 node_modules
 server/node_modules
 /dist
-/build
 records.db
 custom-category.json
 token-info.txt

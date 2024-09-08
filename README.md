@@ -168,3 +168,75 @@ declare global {
 window.electron.ipcRenderer.on("xxxxx");
 window.electron.ipcRenderer.invoke("xxxxx");
 ```
+
+
+
+
+
+## 图标的设置方法
+
+
+
+**建议使用electron-icon-builder里面的方法**
+
+````json
+electron-icon-builder --input=./public/favicon.png --output=build --flatten
+````
+
+
+
+### Mac
+
+mac需要生成对应的icns文件
+
+可以在mac电脑下执行以下命令:
+
+````sh
+mkdir -p icon.iconset
+
+sips -z 16 16     ./favicon.png --out icon.iconset/icon_16x16.png
+sips -z 32 32     ./favicon.png --out icon.iconset/icon_32x32.png
+sips -z 128 128   ./favicon.png --out icon.iconset/icon_128x128.png
+sips -z 256 256   ./favicon.png --out icon.iconset/icon_256x256.png
+cp ./favicon.png icon.iconset/icon_256x256.png
+
+iconutil -c icns icon.iconset
+````
+
+favicon.png 是需要准备的icon原图，尺寸为256 * 256
+
+可能会遇见的问题:
+
+>  Mac 下安装时顶部和底部(以及安装后的列表模式下图标)的小图标花了
+
+原因： 没有设置对应的 extendInfo
+
+在 vue.config.js 文件的 pluginOptions 的 electronBuilder 参数下加入以下内容
+
+````bash
+mac: {
+icon: "./build/icons/icon.icns",
+extendInfo: {
+  CFBundleIconFile: "icon.icns",
+  },
+}
+````
+
+
+
+
+
+### Windows
+
+mac需要生成对应的ico文件
+
+可能遇见的问题:
+
+> 左上角的图标显示不出来
+
+左上角的图标在createWindow中设置，检查icon对应的路径是否正确，一般将ico文件放置在根目录下的public文件夹下，对应的路径写法是:
+
+```ts
+icon: path.join(app.getAppPath(), 'public/favicon.ico'),
+```
+
