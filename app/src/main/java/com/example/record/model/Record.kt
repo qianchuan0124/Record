@@ -21,7 +21,7 @@ abstract class Database: RoomDatabase() {
 
 @Dao
 interface RecordDao {
-    @Query("select * from Record")
+    @Query("select * from Record where isDeleted == 0")
     fun queryAll(): List<Record>
 
     @Query("select * from Record where date >= :startTime and date <= :endTime and isDeleted == 0 ORDER BY date DESC")
