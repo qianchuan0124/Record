@@ -13,9 +13,11 @@ import com.example.record.model.PieColors
 import com.example.record.model.PieData
 import com.example.record.model.SubCategoryRecord
 import com.example.record.model.YearlyData
+import com.example.record.services.DatabaseService
 import com.example.record.services.NotificationReceiver
 import com.example.record.services.NotifyType
 import com.example.record.services.RECORD_NOTIFY
+import com.example.record.utils.CategoryParser
 import com.example.record.utils.DateUtils
 import com.example.record.utils.LogTag
 import com.example.record.utils.RecordApplication
@@ -30,8 +32,7 @@ import java.util.Calendar
 
 @SuppressLint("InlinedApi")
 class AnalysisViewModel: ViewModel()  {
-    private val database: Database =
-        Room.databaseBuilder(RecordApplication.context, Database::class.java, "record.db").build()
+    private val database: Database = DatabaseService.recordDatabase()
 
     private val _analysisState = MutableStateFlow(emptyList<YearlyData>())
     val analysisState: StateFlow<List<YearlyData>> = _analysisState.asStateFlow()
@@ -112,8 +113,8 @@ class AnalysisViewModel: ViewModel()  {
             val years = currentYears()
             val yearlyDataList = years.map {
                 val (startDate, endDate) = DateUtils.yearDateRange(it)
-                val income = database.record().totalIncome(startDate, endDate)
-                val outcome = database.record().totalOutcome(startDate, endDate)
+                val income = database.record().totalIncomeByFilter(startDate, endDate, CategoryParser.allSubCategories())
+                val outcome = database.record().totalOutcomeByFilter(startDate, endDate, CategoryParser.allSubCategories())
                 val records = database.record().recordsWithOutcomeByTime(startDate, endDate)
                 if (records.isEmpty()) {
                     YearlyData(it, listOf(), income, outcome)

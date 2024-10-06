@@ -6,11 +6,11 @@ import android.content.IntentFilter
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.Room
 import com.example.record.R
 import com.example.record.model.Budget
 import com.example.record.model.BudgetInfo
 import com.example.record.model.Database
+import com.example.record.services.DatabaseService
 import com.example.record.services.NotificationReceiver
 import com.example.record.services.NotifyType
 import com.example.record.services.RECORD_NOTIFY
@@ -40,8 +40,7 @@ class BudgetViewModel: ViewModel() {
     val totalOutcomeState: StateFlow<Float> = _totalOutcomeState.asStateFlow()
 
     private val sharedPref = RecordApplication.context.getSharedPreferences(BudgetInfoKey, Context.MODE_PRIVATE)
-    private val database: Database =
-        Room.databaseBuilder(RecordApplication.context, Database::class.java, "record.db").build()
+    private val database: Database = DatabaseService.recordDatabase()
 
     private val _errorState = MutableStateFlow<Exception?>(null)
     val errorState: StateFlow<Exception?> = _errorState.asStateFlow()
@@ -141,7 +140,7 @@ class BudgetViewModel: ViewModel() {
 
         currentInfos.map { budgetInfo ->
             if (budgetInfo.category == context.getString(R.string.total_budget)) {
-                val outcome = database.record().totalOutcome(startDate, endDate)
+                val outcome = database.record().totalOutcomeByFilter(startDate, endDate, CategoryParser.allSubCategories())
                 Budget(Date(), budgetInfo.all, outcome, budgetInfo.category)
             } else {
                 val outcome = database.record().outcomeByCategory(startDate, endDate, budgetInfo.category)
@@ -152,7 +151,7 @@ class BudgetViewModel: ViewModel() {
 
     private suspend fun loadTotalOutcome(): Float = withContext(Dispatchers.IO) {
         val (startDate, endDate) = DateUtils.currentMonthDateRange()
-        database.record().totalOutcome(startDate, endDate)
+        database.record().totalOutcomeByFilter(startDate, endDate, CategoryParser.allSubCategories())
     }
 
     private fun defaultBudgetInfos(): List<BudgetInfo> {

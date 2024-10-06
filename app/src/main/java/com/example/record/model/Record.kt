@@ -13,7 +13,7 @@ import androidx.room.TypeConverters
 import androidx.room.Update
 import java.util.Date
 
-@Database(entities = [Record::class], version = 1)
+@Database(entities = [Record::class], version = 2)
 @TypeConverters(DateConverter::class)
 abstract class Database: RoomDatabase() {
     abstract fun record(): RecordDao
@@ -24,28 +24,28 @@ interface RecordDao {
     @Query("select * from Record")
     fun queryAll(): List<Record>
 
-    @Query("select * from Record where date >= :startTime and date <= :endTime ORDER BY date DESC")
+    @Query("select * from Record where date >= :startTime and date <= :endTime and isDeleted == 0 ORDER BY date DESC")
     fun recordsByTime(startTime: Date, endTime: Date): List<Record>
 
-    @Query("SELECT * FROM Record WHERE date >= :startTime AND date <= :endTime AND ((type IN (:types))) AND ((subCategory IN (:subCategories))) ORDER BY date DESC")
+    @Query("SELECT * FROM Record WHERE date >= :startTime AND date <= :endTime AND ((type IN (:types))) AND ((subCategory IN (:subCategories))) and isDeleted == 0 ORDER BY date DESC")
     fun recordsByFilter(startTime: Date, endTime: Date, types: List<String>, subCategories: List<String>): List<Record>
 
-    @Query("select sum(amount) from Record where type = '收入'")
+    @Query("select sum(amount) from Record where type = '收入' and isDeleted == 0")
     fun totalIncome(): Float
 
-    @Query("select sum(amount) from Record where type = '支出'")
+    @Query("select sum(amount) from Record where type = '支出' and isDeleted == 0")
     fun totalOutcome(): Float
 
-    @Query("select sum(amount) from Record where type = '收入' and date >= :startTime and date <= :endTime")
-    fun totalIncome(startTime: Date, endTime: Date): Float
+    @Query("select sum(amount) from Record where type = '收入' and date >= :startTime AND date <= :endTime AND ((subCategory IN (:subCategories))) and isDeleted == 0")
+    fun totalIncomeByFilter(startTime: Date, endTime: Date, subCategories: List<String>): Float
 
-    @Query("select sum(amount) from Record where type = '支出' and date >= :startTime and date <= :endTime")
-    fun totalOutcome(startTime: Date, endTime: Date): Float
+    @Query("select sum(amount) from Record where type = '支出' and date >= :startTime AND date <= :endTime AND ((subCategory IN (:subCategories))) and isDeleted == 0")
+    fun totalOutcomeByFilter(startTime: Date, endTime: Date, subCategories: List<String>): Float
 
-    @Query("select sum(amount) from Record where type = '支出' and date >= :startTime and date <= :endTime and category = :category")
+    @Query("select sum(amount) from Record where type = '支出' and date >= :startTime and date <= :endTime and category = :category and isDeleted == 0")
     fun outcomeByCategory(startTime: Date, endTime: Date, category: String): Float
 
-    @Query("SELECT * FROM Record WHERE type = '支出' AND date >= :startTime AND date <=:endTime")
+    @Query("SELECT * FROM Record WHERE type = '支出' AND date >= :startTime AND date <=:endTime and isDeleted == 0")
     fun recordsWithOutcomeByTime(startTime: Date, endTime: Date): List<Record>
 
     @Insert
@@ -84,7 +84,8 @@ data class Record(
     val category: String,
     val subCategory: String,
     val remark: String = "",
-    val isDeleted: Boolean = false
+    var isDeleted: Boolean = false,
+    var syncId: Int = 0
 )
 
 class DateConverter {

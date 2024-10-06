@@ -24,8 +24,7 @@ object ExcelService {
 
     const val XLSXTYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-    private val database: Database =
-        Room.databaseBuilder(RecordApplication.context, Database::class.java, "record.db").build()
+    private val database: Database = DatabaseService.recordDatabase()
 
     fun exportName(): String {
         val context = RecordApplication.context

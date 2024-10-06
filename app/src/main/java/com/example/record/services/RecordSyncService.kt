@@ -21,8 +21,7 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
 object RecordSyncService: CoroutineScope {
-    private val database: Database =
-        Room.databaseBuilder(RecordApplication.context, Database::class.java, "record.db").build()
+    private val database: Database = DatabaseService.recordDatabase()
 
     private val _errorState = MutableStateFlow<Exception?>(null)
     val errorState: StateFlow<Exception?> = _errorState.asStateFlow()
@@ -122,6 +121,7 @@ object RecordSyncService: CoroutineScope {
             val batchSize = 100
             val batches = records.chunked(batchSize)
             var skip = 0
+            var update = 0
             try {
                 batches.forEach { batch ->
                     batch.forEach { record ->
@@ -138,6 +138,11 @@ object RecordSyncService: CoroutineScope {
                                 record.id = 0
                                 recordDao.insert(record)
                                 Log.d(LogTag.SyncRecord, "插入数据: $record")
+                            } else if (duplicate.syncId < record.syncId){
+                                Log.d(LogTag.SyncRecord, "更新数据: $record")
+                                record.id = duplicate.id
+                                recordDao.update(record)
+                                update += 1
                             } else {
                                 Log.d(LogTag.SyncRecord, "发现重复数据: $record")
                                 skip += 1
@@ -145,7 +150,7 @@ object RecordSyncService: CoroutineScope {
                         }
                     }
                 }
-                Log.d(LogTag.SyncRecord, "插入成功, 数量: ${records.size} skip: $skip")
+                Log.d(LogTag.SyncRecord, "插入成功, 数量: ${records.size} skip: $skip update:$update")
             } catch (e: Exception) {
                 // 处理异常，例如记录日志或向用户显示错误消息
                 Log.e(LogTag.SyncRecord, "插入数据失败", e)
@@ -165,7 +170,6 @@ object RecordSyncService: CoroutineScope {
 
             while (true) {
                 val offset = (page - 1) * pageSize
-
                 val records = database.record().recordsByLimit(pageSize, offset)
                 currentCount += records.size
 

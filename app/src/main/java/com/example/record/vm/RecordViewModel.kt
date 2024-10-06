@@ -6,12 +6,12 @@ import android.content.IntentFilter
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.room.Room
 import com.example.record.R
 import com.example.record.model.Database
 import com.example.record.model.Filter
 import com.example.record.model.Record
 import com.example.record.model.RecordError
+import com.example.record.services.DatabaseService
 import com.example.record.services.NotificationReceiver
 import com.example.record.services.NotifyCenter
 import com.example.record.services.NotifyType
@@ -31,8 +31,7 @@ import kotlinx.coroutines.withContext
 @SuppressLint("InlinedApi")
 class RecordViewModel: ViewModel() {
 
-    private val database: Database =
-        Room.databaseBuilder(RecordApplication.context, Database::class.java, "record.db").build()
+    private val database: Database = DatabaseService.recordDatabase()
 
     private val _recordsState = MutableStateFlow(emptyList<Record>())
     val recordsState: StateFlow<List<Record>> = _recordsState.asStateFlow()
@@ -142,12 +141,14 @@ class RecordViewModel: ViewModel() {
         }
         _totalOutcomeState.update { totalOutcome }
 
+        val filterCategories = _filterState.value.subCategories.ifEmpty { CategoryParser.allSubCategories() }
+
         val rangeIncome = withContext(Dispatchers.IO) {
-            database.record().totalIncome(startDate, endDate)
+            database.record().totalIncomeByFilter(startDate, endDate, filterCategories)
         }
         _rangeIncomeState.update { rangeIncome }
         val rangeOutcome = withContext(Dispatchers.IO) {
-            database.record().totalOutcome(startDate, endDate)
+            database.record().totalOutcomeByFilter(startDate, endDate, filterCategories)
         }
         _rangeOutcomeState.update { rangeOutcome }
     }
@@ -265,12 +266,15 @@ class RecordViewModel: ViewModel() {
     }
 
     private fun updateRecord(record: Record): Boolean {
+        record.syncId += 1
         database.record().update(record)
         return true
     }
 
     private fun deleteRecord(record: Record): Boolean {
-        database.record().delete(record)
+        record.isDeleted = true
+        record.syncId += 1
+        database.record().update(record)
         return true
     }
 }
