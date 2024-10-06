@@ -22,7 +22,8 @@ CREATE TABLE record (
     category TEXT NOT NULL,
     subCategory TEXT NOT NULL,
     remark TEXT NOT NULL,
-    isDeleted BOOLEAN Default 0
+    isDeleted BOOLEAN Default 0,
+    syncId INTEGER DEFAULT 0
 );
 `
 
@@ -45,6 +46,7 @@ db.get(
         }
         if (row) {
             logInfo('Table "record" already exists.');
+            upgrateDatabase();
         } else {
             logInfo('Table "record" does not exist. Creating table...');
             // 读取schema.sql文件并执行SQL语句创建表
@@ -58,6 +60,27 @@ db.get(
         }
     }
 );
+
+function upgrateDatabase() {
+    // 检查是否已经有syncId列
+    db.all("PRAGMA table_info(record);", (err, rows: any[]) => { // 使用 db.all 而不是 db.get
+        if (err) {
+            logError("Check columns failed, error:" + err.message);
+            return;
+        }
+        const hasSyncId = rows.some(row => row.name === "syncId");
+        if (!hasSyncId) {
+            // 如果没有syncId列，则添加
+            db.exec("ALTER TABLE record ADD COLUMN syncId INTEGER DEFAULT 0;", (err) => {
+                if (err) {
+                    logError("Add column 'syncId' failed, error:" + err.message);
+                    return;
+                }
+                logInfo("Column 'syncId' has been added to 'record' table.");
+            });
+        }
+    });
+}
 
 export function databaseListen() {
     ipcMain.handle(IpcType.TOTAL_AMOUNT_BY_Filter, async (event, filter) => {
@@ -112,7 +135,7 @@ export function databaseListen() {
     ipcMain.handle(IpcType.UPDATE_RECORD, async (event, record) => {
         logInfo("will update record");
         try {
-            const result = await updateRecord(JSON.parse(record) as Record);
+            const result = await updateRecord(JSON.parse(record) as Record, true);
             logInfo("update record success");
             return handleResult(result);
         }
@@ -126,7 +149,7 @@ export function databaseListen() {
         logInfo("will delete record");
         try {
             const realRecord = JSON.parse(record) as Record;
-            const result = await updateRecord({ ...realRecord, isDeleted: true });
+            const result = await updateRecord({ ...realRecord, isDeleted: true }, true);
             logInfo("delete record success");
             return handleResult(result);
         }
@@ -406,7 +429,7 @@ async function fetchTotalAmount(): Promise<{ income: number; outcome: number }> 
     });
 }
 
-async function updateRecord(record: Record): Promise<number> {
+async function updateRecord(record: Record, addSyncId: Boolean): Promise<number> {
     const { id, date, type, subCategory, category, amount, remark } = record;
     if (!id) {
         logError("Record id is empty");
@@ -438,10 +461,12 @@ async function updateRecord(record: Record): Promise<number> {
 
     logInfo("update record, record id:" + id);
 
+    const newSyncId = addSyncId ? record.syncId + 1 : record.syncId;
+
     const row = await new Promise((resolve, reject) => {
         db.run(
-            "UPDATE record SET date = ?, type = ?, subCategory = ?, category = ?, amount = ?, remark = ?, isDeleted = ? WHERE id = ? and isDeleted = 0",
-            [timestamp, type, subCategory, category, amount, remark, record.isDeleted, id],
+            "UPDATE record SET date = ?, type = ?, subCategory = ?, category = ?, amount = ?, remark = ?, isDeleted = ?, syncId = ? WHERE id = ? and isDeleted = 0",
+            [timestamp, type, subCategory, category, amount, remark, record.isDeleted, newSyncId, id],
             function (err) {
                 if (err) {
                     reject(new Error(ErrorType.DATA_BASE_ERROR));
@@ -683,21 +708,32 @@ async function batchDeleteRecords(ids: number[]) {
     if (!ids || ids.length === 0) {
         throw new Error(ErrorType.RECORD_NOT_EXIST);
     } else {
-        const sql = "UPDATE record SET isDeleted = 1 WHERE id = ?";
-        const stmt = db.prepare(sql);
-        ids.forEach((id) => {
-            stmt.run(id);
-        });
-        stmt.finalize((err) => {
-            if (err) {
-                throw new Error(ErrorType.DATA_BASE_ERROR);
-            } else {
-                return ids;
-            }
+        ids.forEach(async (id) => {
+            // 查询当前的syncId
+            const currentSyncIdQuery = "SELECT syncId FROM record WHERE id = ?";
+            const currentSyncId = await new Promise((resolve, reject) => {
+                db.get(currentSyncIdQuery, [id], (err, row: any) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(row.syncId);
+                    }
+                });
+            }) as number;
+
+            // 更新记录
+            const newSyncId = currentSyncId + 1;
+            const sql = "UPDATE record SET isDeleted = 1, syncId = ? WHERE id = ?";
+            const stmt = db.prepare(sql);
+            stmt.run([newSyncId, id], (err) => {
+                if (err) {
+                    throw new Error(ErrorType.DATA_BASE_ERROR);
+                }
+            });
+            stmt.finalize();
         });
     }
 }
-
 async function fetchAllRecords(): Promise<Record[]> {
     return new Promise((resolve, reject) => {
         db.all("SELECT * FROM record WHERE isDeleted = 0 order by date desc", (err, rows) => {
@@ -712,7 +748,7 @@ async function fetchAllRecords(): Promise<Record[]> {
 
 export async function getRecordsCount(): Promise<Number> {
     return new Promise((resolve, reject) => {
-        db.get("SELECT COUNT(*) as total FROM record WHERE isDeleted = 0", (err, row: any) => {
+        db.get("SELECT COUNT(*) as total FROM record", (err, row: any) => {
             if (err) {
                 reject(err);
             } else {
@@ -724,8 +760,11 @@ export async function getRecordsCount(): Promise<Number> {
 
 export async function insertRecordsIfNeeded(records: Record[]): Promise<void> {
     return new Promise((resolve, reject) => {
-        const sql = "SELECT COUNT(*) as total FROM record WHERE date = ? AND type = ? AND category = ? AND subCategory = ? AND amount = ? AND remark = ?";
+        const sql = "SELECT * FROM record WHERE date = ? AND type = ? AND category = ? AND subCategory = ? AND amount = ? AND remark = ?";
         const stmt = db.prepare(sql);
+        let insert = 0
+        let skip = 0
+        let update = 0
         records.forEach((record) => {
             const dateObj = new Date(record.date);
             dateObj.setHours(0, 0, 0, 0);
@@ -734,19 +773,30 @@ export async function insertRecordsIfNeeded(records: Record[]): Promise<void> {
                 if (err) {
                     reject(err);
                 } else {
-                    if (row.total === 0) {
+                    if (!row) {
                         createRecord(record);
+                        console.log("Record sync - Record not exists, create it, record id:" + record.id);
+                        insert += 1
+                    } else if (row.syncId < record.syncId) {
+                        record.id = row.id;
+                        updateRecord(record, false);
+                        console.log("Record sync - Record exists, update it, record id:" + record.id);
+                        update += 1
+                    } else {
+                        console.log("Record sync - Record already exists, ignore it, record id:" + row.id);
+                        skip += 1
                     }
                 }
             });
         });
+        console.log("Record sync - Insert:" + insert + ", Update:" + update + ", Skip:" + skip);
         resolve();
     });
 }
 
 export async function getRecordsByLimit(limit: Number, offset: Number): Promise<Record[]> {
     return new Promise((resolve, reject) => {
-        db.all("SELECT * FROM record WHERE isDeleted = 0 order by date desc limit ? offset ?", [limit, offset], (err, rows) => {
+        db.all("SELECT * FROM record order by date desc limit ? offset ?", [limit, offset], (err, rows) => {
             if (err) {
                 reject(err);
             } else {

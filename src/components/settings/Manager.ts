@@ -170,7 +170,8 @@ export function parseImportData(jsonData: any[]): [ImportFailedResult[], Record[
                 category: category,
                 subCategory: subCategory,
                 remark: item[L10n.remark]?.toString() || "",
-                isDeleted: false
+                isDeleted: false,
+                syncId: 0
             }
             successResult.push(record)
         }

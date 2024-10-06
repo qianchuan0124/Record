@@ -7,6 +7,7 @@ export interface Record {
     subCategory: string;
     remark: string;
     isDeleted: Boolean;
+    syncId: number;
 }
 
 export interface DailyRecords {

@@ -174,7 +174,7 @@
 
     <el-dialog
       v-model="deleteConfirmVisible"
-      title="Warning"
+      :title="L10n.delete"
       width="500"
       align-center>
       <span>{{ L10n.confirm_delete_tip }}</span>
@@ -328,6 +328,7 @@ async function updateRecord() {
     date: date,
     remark: remark,
     isDeleted: false,
+    syncId: 0,
   };
 
   try {
