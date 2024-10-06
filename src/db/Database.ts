@@ -60,10 +60,10 @@ db.get(
 );
 
 export function databaseListen() {
-    ipcMain.handle(IpcType.TOTAL_AMOUNT_BY_DATE_RANGE, async (event, start, end) => {
+    ipcMain.handle(IpcType.TOTAL_AMOUNT_BY_Filter, async (event, filter) => {
         logInfo("fetch total amount by date range");
         try {
-            const result = await fetchTotalAmountByRange(new Date(start), new Date(end));
+            const result = await fetchTotalAmountByFilter(filter);
             return handleResult(result);
         }
         catch (error: unknown) {
@@ -269,15 +269,37 @@ export function databaseListen() {
     })
 }
 
-async function fetchTotalAmountByRange(start: Date, end: Date) {
-    const sql = `
-            SELECT
+async function fetchTotalAmountByFilter(filter: string) {
+    const { types, categorys, startTime, endTime, keyword } = JSON.parse(filter);
+    let sql = ` SELECT
                 SUM(CASE WHEN type = '收入' THEN amount ELSE 0 END) AS income,
-                SUM(CASE WHEN type = '支出' THEN amount ELSE 0 END) AS outcome
-            FROM record
-            WHERE isDeleted = 0 AND date >= ? AND date <= ?
-        `;
-    const params = [getDaliyStart(start), getDaliyEnd(end)];
+                SUM(CASE WHEN type = '支出' THEN amount ELSE 0 END) AS outcome FROM record WHERE isDeleted = 0`;
+    let params: any[] = [];
+
+    if (types && types.length > 0) {
+        sql += ` AND type IN (${types.map(() => '?').join(',')})`;
+        params = params.concat(types);
+    }
+    if (categorys && categorys.length > 0) {
+        sql += ` AND subCategory IN (${categorys.map(() => '?').join(',')})`;
+        params = params.concat(categorys);
+    }
+    if (startTime) {
+        sql += " AND date >= ?";
+        params.push(new Date(startTime).getTime());
+    }
+    if (endTime) {
+        sql += " AND date <= ?";
+        params.push(new Date(endTime).getTime());
+    }
+    if (keyword) {
+        const keywordPattern = `%${keyword}%`;
+        sql += " AND (remark LIKE ? OR type LIKE ? OR subCategory LIKE ? OR amount LIKE ?)";
+        params.push(keywordPattern, keywordPattern, keywordPattern, keywordPattern);
+    }
+
+    logInfo("fetch total amount by filter sql:" + sql);
+
     return new Promise((resolve, reject) => {
         db.get(sql, params, (err, row: any) => {
             if (err) {

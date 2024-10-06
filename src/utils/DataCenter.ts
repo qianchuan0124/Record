@@ -16,9 +16,9 @@ export function logError(content: string) {
 // DashBoard Network
 
 // 获取某段时间内的总收入和总支出
-export async function fetchTotalAmountByDateRange(start: Date, end: Date): Promise<{ income: number, outcome: number }> {
+export async function fetchTotalAmountByFilter(filter: string): Promise<{ income: number, outcome: number }> {
     try {
-        const response = await window.electron.ipcRenderer.invoke(IpcType.TOTAL_AMOUNT_BY_DATE_RANGE, start.getTime(), end.getTime());
+        const response = await window.electron.ipcRenderer.invoke(IpcType.TOTAL_AMOUNT_BY_Filter, filter);
         const data = JSON.parse(response) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);

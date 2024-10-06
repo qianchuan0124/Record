@@ -1,5 +1,6 @@
 import { Month } from "@/models/Month";
-import { fetchTotalAmountByDateRange } from "@/utils/DataCenter";
+import { Filter } from "@/models/Filter";
+import { fetchTotalAmountByFilter } from "@/utils/DataCenter";
 
 // 生成去年、今年、明年的月份数组
 export async function generateMonths(): Promise<Month[]> {
@@ -45,8 +46,15 @@ export async function fetchTotalAmountByMonth(
     const month = date.getMonth() + 1;
     const start = new Date(Number(year), Number(month) - 1, 1)
     const end = new Date(Number(year), Number(month), 0)
-
-    return fetchTotalAmountByDateRange(start, end);
+    const filter: Filter = {
+        types: [],
+        categorys: [],
+        startTime: start,
+        endTime: end,
+        keyword: "",
+        isAll: false,
+    }
+    return fetchTotalAmountByFilter(JSON.stringify(filter));
 }
 
 // 根据日期获取对应日期的第一天和最后一天

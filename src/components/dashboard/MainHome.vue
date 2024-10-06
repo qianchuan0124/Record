@@ -96,7 +96,7 @@ onDeactivated(() => {
 }
 
 .el-tabs--right {
-  overflow-y: auto; /* 只在垂直方向上显示滚动条 */
+  overflow-y: hidden; /* 只在垂直方向上显示滚动条 */
   overflow-x: hidden; /* 隐藏水平方向的滚动条 */
 }
 

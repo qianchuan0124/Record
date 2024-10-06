@@ -67,7 +67,7 @@ import {
 import { Record } from "@/models/Record";
 import { Month } from "@/models/Month";
 import { getFirstAndLastDate } from "./managers/MonthManager";
-import { fetchTotalAmountByDateRange } from "@/utils/DataCenter";
+import { fetchTotalAmountByFilter } from "@/utils/DataCenter";
 import { Filter } from "@/models/Filter";
 import { findTypeLabelByValue } from "@/configs/CategoryParser";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
@@ -141,9 +141,9 @@ function handleRemarkUpdate(remark: string) {
   emit("filterChanged", currentFilter.value);
 }
 
-async function updateDisplayValues(startDate: Date, endDate: Date) {
+async function updateDisplayValues(filter: string) {
   try {
-    const res = await fetchTotalAmountByDateRange(startDate, endDate);
+    const res = await fetchTotalAmountByFilter(filter);
     income.value = "+ " + res.income.toFixed(2);
     expend.value = "- " + res.outcome.toFixed(2);
     const remainValue = res.income - res.outcome;
@@ -172,7 +172,15 @@ function onMonthChanged(changedMonth: Month) {
 function updateTime(startTime: Date, endTime: Date) {
   displayDate.value =
     formatDateByDot(startTime) + " ~ " + formatDateByDot(endTime);
-  updateDisplayValues(startTime, endTime);
+  const filter: Filter = {
+    types: currentFilter.value.types,
+    categorys: currentFilter.value.categorys,
+    keyword: currentFilter.value.keyword,
+    startTime: startTime,
+    endTime: endTime,
+    isAll: currentFilter.value.isAll,
+  };
+  updateDisplayValues(JSON.stringify(filter));
   timeFilter.value?.setupSelectedTime([startTime, endTime]);
   currentFilter.value.startTime = startTime;
   currentFilter.value.endTime = endTime;
@@ -186,10 +194,15 @@ function onRecordChanged(record: Record) {
       currentFilter.value.endTime
     )
   ) {
-    updateDisplayValues(
-      currentFilter.value.startTime,
-      currentFilter.value.endTime
-    );
+    const filter: Filter = {
+      types: currentFilter.value.types,
+      categorys: currentFilter.value.categorys,
+      keyword: currentFilter.value.keyword,
+      startTime: currentFilter.value.startTime,
+      endTime: currentFilter.value.endTime,
+      isAll: currentFilter.value.isAll,
+    };
+    updateDisplayValues(JSON.stringify(filter));
   }
 }
 
