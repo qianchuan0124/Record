@@ -3,8 +3,8 @@ import { getCategories } from "@/configs/CategoryParser";
 import { Record } from "@/models/Record";
 import L10n from "@/configs/L10n.json"
 import { formatDate } from "@/utils/DateUtils"
-import { SingleYearlyData, SingleCategoryData, YearlyData, TimeLineRecord } from "@/models/AnalysisData"
-import { fetchYearlyData, fetchCategoryData, fetchYearlyCategoryData, fetchTimeLineData, logError } from "@/utils/DataCenter"
+import { SingleYearlyData, SingleCategoryData, YearlyData, TimeLineRecord, CategoryItem } from "@/models/AnalysisData"
+import { fetchYearlyData, fetchCategoryData, fetchYearlyCategoryData, fetchTimeLineData, logError, fetchYearlyTotalInfo } from "@/utils/DataCenter"
 
 export interface YearlyAnalysis {
     name: string;
@@ -108,6 +108,38 @@ export async function generateYearlyCategoryNode(year: number, category: string)
     catch (error: unknown) {
         logError("Creating record failed:" + error);
         throw error; // 或者返回一个默认值，如 return [];
+    }
+}
+
+export async function generateYearlyTotalInfo(year: number): Promise<CategoryNode> {
+    try {
+        const data = await fetchYearlyTotalInfo(year);
+        return parseYearlyTotalData(year, data);
+    }
+    catch (error: unknown) {
+        logError("Creating record failed:" + error);
+        throw error; // 或者返回一个默认值，如 return [];
+    }
+}
+
+function parseYearlyTotalData(year: number, response: CategoryItem[]): CategoryNode {
+    const sortedData = response.sort((a, b) => b.total - a.total);
+    // 如果value是空的，则过滤掉
+    const filteredData = sortedData.filter((data) => data.total > 0);
+    return {
+        id: String(year),
+        label: String(year),
+        level: 0,
+        amount: String(response.reduce((sum, item) => sum + item.total, 0).toFixed(2)),
+        record: undefined,
+        children: filteredData.map((item) => ({
+            id: item.category,
+            label: item.category,
+            level: 1,
+            amount: String(item.total.toFixed(2)),
+            record: undefined,
+            children: []
+        }))
     }
 }
 

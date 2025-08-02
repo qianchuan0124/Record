@@ -119,6 +119,7 @@ function handleCategoryUpdate(category: string[]) {
     return item[1];
   });
   currentFilter.value.categorys = filterCategory;
+  refreshInfos()
   emit("filterChanged", currentFilter.value);
 }
 
@@ -194,7 +195,12 @@ function onRecordChanged(record: Record) {
       currentFilter.value.endTime
     )
   ) {
-    const filter: Filter = {
+    refreshInfos()
+  }
+}
+
+function refreshInfos() {
+  const filter: Filter = {
       types: currentFilter.value.types,
       categorys: currentFilter.value.categorys,
       keyword: currentFilter.value.keyword,
@@ -203,7 +209,6 @@ function onRecordChanged(record: Record) {
       isAll: currentFilter.value.isAll,
     };
     updateDisplayValues(JSON.stringify(filter));
-  }
 }
 
 function registerNotify() {

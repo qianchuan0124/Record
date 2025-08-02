@@ -27,7 +27,10 @@
     </div>
     <div class="detail-data" v-if="data.length !== 0">
       <div class="detail-container">
-        <div class="detail-title">{{ L10n.detail }}</div>
+        <div class="detail-title">
+          <span>{{ L10n.detail }}</span>
+          <span class="all-span" @click="onTapTotal">{{ L10n.all }}</span>
+        </div>
         <el-tree-v2
           style="max-width: calc(100vh)"
           :data="data"
@@ -99,6 +102,7 @@ import * as echarts from "echarts";
 import {
   fetchYearlyAnalysis,
   generateYearlyCategoryNode,
+  generateYearlyTotalInfo,
   CategoryNode,
 } from "./Manager";
 import Color from "@/configs/Color.json";
@@ -113,6 +117,8 @@ const beforeStartYear = ref<string>((new Date().getFullYear() - 4).toString());
 const beforeEndYear = ref<string>(new Date().getFullYear().toString());
 
 const myEchart = ref<HTMLDivElement | null>(null);
+
+const currentYear = ref<number>(0);
 
 function disabledStartYear(time: Date) {
   return time.getFullYear() > Number(endYear.value);
@@ -228,6 +234,7 @@ onMounted(async () => {
   yearlyChart.value.on("click", function (params) {
     const category = params.seriesName;
     const year = Number(params.name);
+    currentYear.value = year;
     if (category && year) {
       reloadDetailValues(year, category);
     }
@@ -238,6 +245,22 @@ onMounted(async () => {
 async function reloadDetailValues(year: number, category: string) {
   try {
     data.value = [await generateYearlyCategoryNode(year, category)];
+  } catch (error) {
+    if (error instanceof Error) {
+      ElMessage.error(error.message);
+    } else {
+      ElMessage.error(L10n.system_error);
+    }
+  }
+}
+
+async function onTapTotal() {
+  reloadYearlyTotalInfo(currentYear.value);
+}
+
+async function reloadYearlyTotalInfo(year: number) {
+  try {
+    data.value = [await generateYearlyTotalInfo(year)];
   } catch (error) {
     if (error instanceof Error) {
       ElMessage.error(error.message);
@@ -323,6 +346,9 @@ const data = ref<CategoryNode[]>([]);
 }
 
 .detail-title {
+  display: flex;
+  justify-content: space-between; /* 左右两边对齐 */
+  align-items: center; /* 垂直居中 */
   font-size: 16px;
   font-weight: 700;
   color: v-bind("Color.primary");
@@ -332,7 +358,12 @@ const data = ref<CategoryNode[]>([]);
   margin-bottom: 12px;
   margin-top: 12px;
   text-align: left;
-  padding: 4px 0px 4px 12px;
+  padding: 4px 16px 4px 12px;
+}
+
+.all-span {
+  color: v-bind("Color.info");
+  cursor: pointer;
 }
 
 .record-level {

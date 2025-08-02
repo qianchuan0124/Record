@@ -211,6 +211,19 @@ export function databaseListen() {
         }
     })
 
+    ipcMain.handle(IpcType.YEARLY_TOTAL_CATEGORY, async (event, year) => {
+        logInfo("will fetch total amount by category in years");
+        try {
+            const result = await getYearlyTotalInfo(year);
+            logInfo("fetch total amount by category in years success");
+            return handleResult(result);
+        }
+        catch (error: unknown) {
+            logError("Fetching total amount by category in years failed:" + error);
+            return handleError(error);
+        }
+    })
+
     ipcMain.handle(IpcType.TIME_LINE_DATA, async () => {
         logInfo("will fetch time line data");
         try {
@@ -559,6 +572,20 @@ async function getTopSubCategoryByAmount(category: string) {
     } catch (error) {
         throw new Error(ErrorType.DATA_BASE_ERROR);
     }
+}
+
+// 获取某一年所有分类的支出信息
+async function getYearlyTotalInfo(year: number) {
+    // 获取某一年所有分类的支出信息
+    const start = new Date(year, 0, 1).getTime();
+    const end = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
+    const sql = `
+        SELECT category, ROUND(SUM(amount), 2) as total 
+        FROM record 
+        WHERE date >= ? AND date <= ? AND isDeleted = 0 AND type = '支出' 
+        GROUP BY category
+    `;
+    return await dbAll(sql, [start, end]) as { category: string; total: number }[];
 }
 
 async function getTopSubCategoryByYear(year: number, category: string) {

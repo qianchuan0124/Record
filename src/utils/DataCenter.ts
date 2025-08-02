@@ -1,7 +1,7 @@
 import { Filter } from "@/models/Filter";
 import { IpcResponse, IpcType } from "@/models/IpcResponse";
 import { Record } from "@/models/Record";
-import { SingleYearlyData, TotalCategory, SingleCategoryData, YearlyData, TimeLineRecord } from "@/models/AnalysisData"
+import { SingleYearlyData, TotalCategory, SingleCategoryData, YearlyData, TimeLineRecord, CategoryItem } from "@/models/AnalysisData"
 import { CategorySettingNode } from "@/models/CategorySettingNode"
 import { CategoryNodeItem } from '@/models/CategoryNodeItem'
 
@@ -182,6 +182,23 @@ export async function fetchYearlyCategoryData(year: number, category: string): P
     }
     catch (error: unknown) {
         logError("Fetching yearly category data failed:" + error);
+        throw error;
+    }
+}
+
+// 获取某年所有的category数据
+export async function fetchYearlyTotalInfo(year: number): Promise<CategoryItem[]> {
+    try {
+        const result = await window.electron.ipcRenderer.invoke(IpcType.YEARLY_TOTAL_CATEGORY, year);
+        const data = JSON.parse(result) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        } else {
+            return data.data as CategoryItem[];
+        }
+    }
+    catch (error: unknown) {
+        logError("Fetching yearly total info failed:" + error);
         throw error;
     }
 }
