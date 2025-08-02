@@ -1,6 +1,6 @@
 {
   "name": "record",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "productName": "记账清单",
   "win": {
     "icon": "public/favicon.ico"
