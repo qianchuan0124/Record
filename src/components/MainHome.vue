@@ -1,27 +1,27 @@
 <template>
-  <el-tabs :tab-position="tabPosition" class="demo-tabs">
-    <el-tab-pane class="first-top">
+  <el-tabs :tab-position="tabPosition" class="app-tabs">
+    <el-tab-pane>
       <template #label>
         <span class="custom-tabs-label">
-          <img class="panel_icon" src="@/assets/dashboard_icon.svg" />
+          <el-icon class="panel_icon"><Grid /></el-icon>
           <span class="panel_title">{{ L10n.dashboard }}</span>
         </span>
       </template>
       <DashboardHome></DashboardHome>
     </el-tab-pane>
-    <el-tab-pane label="User" class="analysis-item">
+    <el-tab-pane>
       <template #label>
         <span class="custom-tabs-label">
-          <img class="panel_icon" src="@/assets/analysis_icon.svg" />
+          <el-icon class="panel_icon"><PieChart /></el-icon>
           <span class="panel_title">{{ L10n.analysis }}</span>
         </span>
       </template>
       <AnalysisHome></AnalysisHome>
     </el-tab-pane>
-    <el-tab-pane label="Config" class="config-item">
+    <el-tab-pane>
       <template #label>
         <span class="custom-tabs-label">
-          <img class="panel_icon" src="@/assets/dashboard_icon.svg" />
+          <el-icon class="panel_icon"><Setting /></el-icon>
           <span class="panel_title">{{ L10n.settings }}</span>
         </span>
       </template>
@@ -33,8 +33,8 @@
 <script lang="ts" setup>
 import { ref } from "vue";
 import type { TabsInstance } from "element-plus";
+import { Grid, PieChart, Setting } from "@element-plus/icons-vue";
 import DashboardHome from "./dashboard/MainHome.vue";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import AnalysisHome from "./analysis/MainHome.vue";
 import SettingHome from "./settings/MainHome.vue";
@@ -43,75 +43,84 @@ const tabPosition = ref<TabsInstance["tabPosition"]>("left");
 </script>
 
 <style scoped>
-.demo-tabs {
+.app-tabs {
+  height: 100%;
   user-select: none;
-  height: calc(100vh - 72px);
-}
-</style>
-
-<style>
-.first-top {
-  margin-top: 12px;
-  overflow-y: scroll;
 }
 
-.analysis-item .config-item {
-  overflow-y: scroll;
+.app-tabs > :deep(.el-tabs__header) {
+  width: 200px;
+  margin: 0;
+  padding-top: 16px;
+  background-color: transparent;
 }
 
-.empty-page {
-  width: 50%;
-  height: 50%;
-  padding-top: 100px;
+/* Element Plus 左侧 tab 默认给 header 10px 右外边距，收敛为 0 以减小侧边栏与内容区空隙 */
+.app-tabs > :deep(.el-tabs__header.is-left) {
+  margin-right: 0;
+}
+
+.app-tabs > :deep(.el-tabs__header) .el-tabs__nav-wrap::after {
+  display: none;
+}
+
+.app-tabs > :deep(.el-tabs__header) .el-tabs__nav {
+  width: calc(100% - 24px);
+  margin: 0 12px;
+}
+
+.app-tabs > :deep(.el-tabs__header) .el-tabs__item {
+  display: flex;
+  align-items: center;
+  height: 44px;
+  margin-bottom: 4px;
+  padding: 0 12px !important;
+  border-radius: 8px;
+  color: #5a6274;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.app-tabs > :deep(.el-tabs__header) .el-tabs__item:hover {
+  background-color: #f0f0f5;
+  color: #1b1f27;
+}
+
+.app-tabs > :deep(.el-tabs__header) .el-tabs__item.is-active {
+  background-color: #efecfb;
+  color: #6c5dd3;
+}
+
+.app-tabs > :deep(.el-tabs__header) .el-tabs__active-bar {
+  display: none;
+}
+
+.app-tabs > :deep(.el-tabs__content) {
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.app-tabs > :deep(.el-tabs__content) > .el-tab-pane {
+  height: 100%;
 }
 
 .custom-tabs-label {
   display: flex;
   align-items: center;
+  gap: 10px;
+  width: 100%;
+  font-size: 14px;
+  font-weight: 500;
+  color: inherit;
 }
+
 .panel_icon {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
 }
 
 .panel_title {
-  font-size: 15;
-  font-weight: 700;
-  color: v-bind("Color.info");
-  margin-left: 10px;
-}
-
-.demo-tabs > .el-tabs__content {
-  color: #6b778c;
-  font-size: 32px;
-  font-weight: 600;
-  margin-top: 24px;
-  overflow: auto !important;
-}
-
-.el-tabs__item {
-  margin-right: 32px;
-  margin-left: 32px;
-  margin-bottom: 15px;
-  padding-left: 0px !important;
-  height: 40px !important;
-}
-
-.el-tabs__header {
-  margin-right: 0px !important;
-  background-color: white;
-}
-
-/* .el-tabs--right .el-tabs__content,
-.el-tabs--left .el-tabs__content {
-  height: 100%;
-} */
-
-.el-tabs__nav-wrap:after {
-  background-color: transparent !important;
-}
-
-.el-tabs__nav {
-  margin-top: 20px;
+  color: inherit;
 }
 </style>

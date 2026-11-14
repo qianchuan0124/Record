@@ -5,7 +5,7 @@
     :style="{ width: buttonWidth }">
     <span class="button-title">{{ L10n.category }}</span>
     <el-cascader
-      :style="{ width: width, height: height }"
+      :style="{ width: width, height: controlHeight }"
       v-model="categoryValue"
       :options="categoriesOptions"
       :props="categoryProps"
@@ -20,7 +20,7 @@
     <span class="button-title">{{ L10n.amount }}</span>
     <el-input
       v-model="amountValue"
-      :style="{ width: width, height: height }"
+      :style="{ width: width, height: controlHeight }"
       type="number"
       :placeholder="`${L10n.amount_placeholder}`" />
   </div>
@@ -30,7 +30,7 @@
     :style="{ width: buttonWidth }">
     <span class="button-title">{{ L10n.type }}</span>
     <el-cascader
-      :style="{ width: width, height: height }"
+      :style="{ width: width, height: controlHeight }"
       v-model="typeValue"
       :options="typeOptions"
       :props="categoryProps" />
@@ -42,7 +42,7 @@
     <span class="button-title">{{ L10n.remark }}</span>
     <el-input
       v-model="remarkValue"
-      :style="{ width: width, height: height }"
+      :style="{ width: width, height: controlHeight }"
       :placeholder="`${L10n.remark_placeholder}`"
       clearable />
   </div>
@@ -52,7 +52,7 @@
     :style="{ width: buttonWidth }">
     <span class="button-title">{{ L10n.time }}</span>
     <el-date-picker
-      :style="`width:${width}`"
+      :style="`width:${width};height:${controlHeight}`"
       v-model="selectedTime"
       type="date"
       placeholder="Pick a day"
@@ -170,11 +170,20 @@ const { buttonType } = toRefs(props);
 
 const width = ref("");
 const height = ref("");
+// 内部控件高度跟随外框内容区，避免溢出后发现的白底盖住外框上下边框
+const controlHeight = ref("100%");
 
 const buttonWidth = ref("");
 
 // 根据size和buttonType计算宽高
 const calculateDimensions = () => {
+  // 自适应模式：由父级栅格决定宽度，控件填满可用空间
+  if (props.customWidth === "auto") {
+    width.value = "calc(100% - 42px)";
+    buttonWidth.value = "100%";
+    height.value = "32px";
+    return;
+  }
   switch (props.buttonType) {
     case "category":
     case "type":
@@ -344,26 +353,37 @@ function updateCategorys() {
 
 <style scoped>
 .button-title {
-  font-size: 14px;
-  color: v-bind("Color.info");
+  font-size: 12px;
+  font-weight: 600;
+  color: #5a6274;
   margin-right: 10px;
   min-width: 30px;
+  text-align: left;
+  white-space: nowrap;
   user-select: none !important;
 }
 .button-style {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   width: v-bind("buttonWidth");
-  background-color: white; /* 设置背景色为白色 */
-  box-shadow: 2px 2px 4px v-bind("Color.info");
+  height: v-bind("height");
+  padding: 0 10px;
+  background-color: white;
+  border: 1px solid #e3e5ea;
+  border-radius: 8px;
+  font-weight: 600;
   -webkit-app-region: drag;
-  border-radius: 6px; /* 设置圆角 */
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.button-style:hover,
-.button-style:focus {
-  border-color: v-bind("Color.primary"); /* 设置鼠标悬停时的边框颜色 */
+.button-style:hover {
+  border-color: #c9c3ee;
+}
+
+.button-style:focus-within {
+  border-color: v-bind("Color.primary");
+  box-shadow: var(--record-focus-halo, 0 0 0 3px rgba(108, 93, 211, 0.12));
 }
 
 :deep(.el-input__prefix) {
@@ -398,9 +418,23 @@ input[type="number"] {
   user-select: none !important; /* 禁止选中 */
 }
 
+:deep(.el-input),
+:deep(.el-cascader),
+:deep(.el-date-editor) {
+  height: 100%;
+  line-height: normal;
+}
+
 :deep(.el-input__wrapper) {
   box-shadow: none !important;
   padding: 0px;
+  min-height: 0;
+  height: 100%;
+  background-color: transparent;
+}
+
+:deep(.el-input__inner) {
+  font-weight: 600;
 }
 </style>
 

@@ -1,6 +1,6 @@
 'use strict'
 
-import { app, protocol, BrowserWindow, screen } from 'electron'
+import { app, protocol, BrowserWindow, screen, Menu } from 'electron'
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import installExtension, { VUEJS3_DEVTOOLS } from 'electron-devtools-installer'
 const isDevelopment = process.env.NODE_ENV !== 'production'
@@ -14,6 +14,24 @@ import { settingListener } from './utils/SettingCenter'
 protocol.registerSchemesAsPrivileged([
     { scheme: 'app', privileges: { secure: true, standard: true } }
 ])
+
+// 单实例锁：重复点击启动时只保留第一个实例，避免打开多个窗口
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+    app.quit()
+} else {
+    // 第二个实例被启动时，激活已存在的窗口
+    app.on('second-instance', () => {
+        logInfo('APP-INFO:SecondInstance')
+        const win = BrowserWindow.getAllWindows()[0]
+        if (win) {
+            if (win.isMinimized()) win.restore()
+            win.show()
+            win.focus()
+        }
+    })
+}
 
 function defaultSize(): { height: number, width: number } {
     const { width, height } = screen.getPrimaryDisplay().workAreaSize
@@ -52,6 +70,23 @@ async function createWindow() {
         // Load the index.html when not in development
         win.loadURL('app://./index.html')
     }
+
+    if (isDevelopment) {
+        // 菜单栏移除后，开发模式仍保留刷新和开发者工具快捷键
+        win.webContents.on('before-input-event', (event, input) => {
+            if (input.type !== 'keyDown') return
+            const withModifier = process.platform === 'darwin' ? input.meta : input.control
+            const key = input.key.toLowerCase()
+            if ((withModifier && key === 'r') || input.key === 'F5') {
+                win.webContents.reload()
+                event.preventDefault()
+            } else if ((withModifier && input.shift && key === 'i') || input.key === 'F12') {
+                win.webContents.toggleDevTools()
+                event.preventDefault()
+            }
+        })
+    }
+
     autoUpdateApp(win)
     settingListener(win)
 }
@@ -76,6 +111,10 @@ app.on('activate', () => {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', async () => {
+    // 未获取到单实例锁的进程直接退出，不再创建窗口和注册 IPC
+    if (!gotTheLock) {
+        return
+    }
     logInfo('APP-INFO:Ready')
     if (isDevelopment && !process.env.IS_TEST) {
         // Install Vue Devtools
@@ -84,6 +123,17 @@ app.on('ready', async () => {
         } catch (e) {
             logError('Vue Devtools failed to install:' + e)
         }
+    }
+    // 屏蔽 Electron 默认的 File/Edit/View 菜单
+    if (process.platform === 'darwin') {
+        // macOS 菜单栏是全局的无法完全移除，只保留应用菜单和编辑菜单，保证退出、复制粘贴等快捷键可用
+        Menu.setApplicationMenu(Menu.buildFromTemplate([
+            { role: 'appMenu' },
+            { role: 'editMenu' }
+        ]))
+    } else {
+        // Windows/Linux 直接移除菜单栏，刷新和开发者工具快捷键由 createWindow 中的开发模式处理
+        Menu.setApplicationMenu(null)
     }
     createWindow()
     databaseListen()

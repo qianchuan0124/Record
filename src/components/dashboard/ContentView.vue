@@ -4,18 +4,18 @@
     <div class="record-title">
       <el-row>
         <el-col :span="2"></el-col>
-        <el-col :span="3" class="record-title-item">{{ L10n.category }}</el-col>
-        <el-col :span="2" class="record-title-item"></el-col>
-        <el-col :span="3" class="record-title-item">{{ L10n.type }}</el-col>
-        <el-col :span="2" class="record-title-item"></el-col>
-        <el-col :span="3" class="record-title-item">{{ L10n.amount }}</el-col>
-        <el-col :span="2" class="record-title-item"></el-col>
-        <el-col :span="7" class="record-title-item">{{ L10n.remark }}</el-col>
+        <el-col :span="3" class="record-title-item align-left">{{ L10n.category }}</el-col>
+        <el-col :span="2"></el-col>
+        <el-col :span="3" class="record-title-item align-center">{{ L10n.type }}</el-col>
+        <el-col :span="2"></el-col>
+        <el-col :span="3" class="record-title-item align-right">{{ L10n.amount }}</el-col>
+        <el-col :span="2"></el-col>
+        <el-col :span="7" class="record-title-item align-left">{{ L10n.remark }}</el-col>
       </el-row>
     </div>
 
     <div v-if="isLoaded">
-      <div v-if="records.length === 0">
+      <div v-if="records.length === 0" class="empty-container">
         <img class="empty-page" src="@/assets/empty_page.svg" />
       </div>
       <div v-else>
@@ -38,11 +38,11 @@
 
             <div class="right-daliy">
               <span>{{ L10n.income }}</span>
-              <span class="right-daliy-income">
+              <span class="right-daliy-income" :class="{ 'is-empty': dailyRecords.income === 0 }">
                 +{{ dailyRecords.income.toFixed(2) }}
               </span>
               <span class="right-daliy-income-title">{{ L10n.expense }}</span>
-              <span class="right-daliy-expense">
+              <span class="right-daliy-expense" :class="{ 'is-empty': dailyRecords.expense === 0 }">
                 -{{ dailyRecords.expense.toFixed(2) }}
               </span>
             </div>
@@ -59,7 +59,7 @@
                   :class="{ 'is-selected': selectedRecord?.id === record.id }"
                   @click="onTapCell(record)">
                   <el-col :span="2"></el-col>
-                  <el-col :span="3" class="record-item">
+                  <el-col :span="3" class="record-item align-left">
                     <div class="record-category-item">
                       <img
                         :src="
@@ -73,19 +73,19 @@
                     </div>
                   </el-col>
                   <el-col :span="2" class="record-item"></el-col>
-                  <el-col :span="3" class="record-item">
+                  <el-col :span="3" class="record-item align-center">
                     <HightlightSpan
                       :content="record.type"
                       :keyword="currentFilter.keyword"></HightlightSpan>
                   </el-col>
                   <el-col :span="2" class="record-item"></el-col>
-                  <el-col :span="3" class="record-item">
+                  <el-col :span="3" class="record-item align-right">
                     <HightlightSpan
                       :content="String(record.amount.toFixed(2))"
                       :keyword="currentFilter.keyword"></HightlightSpan>
                   </el-col>
                   <el-col :span="2" class="record-item"></el-col>
-                  <el-col :span="7" class="record-item">
+                  <el-col :span="7" class="record-item align-left">
                     <HightlightSpan
                       :content="record.remark"
                       :keyword="currentFilter.keyword"></HightlightSpan>
@@ -96,26 +96,26 @@
                   class="select-record-container">
                   <el-row class="select-record-cell">
                     <!-- <el-col :span="2" class="select-record-item"></el-col> -->
-                    <el-col :span="16" ref="editContainer">
+                    <el-col :span="16">
                       <div class="top-input-elements">
                         <CreateButton
                           :ref="(el: CreateButtonType) => { if (el) categoryRefs = { button: el, recordId: record.id }; }"
                           button-type="category"
-                          :custom-width="normalInputWidth"
+                          custom-width="auto"
                           size="small"
                           :content="selectedRecord.subCategory"></CreateButton>
                         <CreateButton
                           class="first-button"
                           :ref="(el: CreateButtonType) => { if (el) typeRefs = { button: el, recordId: record.id }; }"
                           button-type="type"
-                          :custom-width="normalInputWidth"
+                          custom-width="auto"
                           size="small"
                           :content="selectedRecord.type"></CreateButton>
                         <CreateButton
                           button-type="amount"
                           :ref="(el: CreateButtonType) => { if (el) amountRefs = { button: el, recordId: record.id }; }"
                           size="small"
-                          :custom-width="normalInputWidth"
+                          custom-width="auto"
                           :content="
                             selectedRecord.amount.toString()
                           "></CreateButton>
@@ -134,10 +134,10 @@
                   <el-row class="select-record-cell">
                     <!-- <el-col :span="2" class="select-record-item"></el-col> -->
                     <el-col :span="16">
-                      <div class="top-input-elements">
+                      <div class="top-input-elements input-row-two">
                         <CreateButton
                           button-type="time"
-                          :custom-width="normalInputWidth"
+                          custom-width="auto"
                           :ref="(el: CreateButtonType) => { if (el) timeRefs = { button: el, recordId: record.id }; }"
                           size="small"
                           :content="
@@ -145,7 +145,7 @@
                           "></CreateButton>
                         <CreateButton
                           button-type="remark"
-                          :custom-width="remarkInputWidth"
+                          custom-width="auto"
                           :ref="(el: CreateButtonType) => { if (el) remarkRefs = { button: el, recordId: record.id }; }"
                           size="small"
                           :content="selectedRecord.remark"></CreateButton>
@@ -201,12 +201,12 @@ import {
   onDeactivated,
   onUnmounted,
 } from "vue";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import AccountButton from "@/components/utils/AccountButton.vue";
 import CreateButton from "@/components/utils/CreateButton.vue";
 import HightlightSpan from "@/components/utils/HightlightSpan.vue";
 import { ElMessage } from "element-plus";
+import { notifySuccess } from "@/utils/GlobalErrorHandler";
 import { Filter } from "@/models/Filter";
 import { getFirstAndLastDate } from "./managers/MonthManager";
 import { Record, DailyRecords } from "@/models/Record";
@@ -289,7 +289,7 @@ async function deleteRecord() {
       );
     }
     selectedRecord.value = null;
-    ElMessage.success(L10n.delete_success);
+    notifySuccess(L10n.delete_success);
     deleteConfirmVisible.value = false;
   } catch (error) {
     if (error instanceof Error) {
@@ -340,7 +340,7 @@ async function updateRecord() {
       );
     }
     selectedRecord.value = null;
-    ElMessage.success(L10n.update_success);
+    notifySuccess(L10n.update_success);
   } catch (error) {
     if (error instanceof Error) {
       ElMessage.error(error.message);
@@ -418,145 +418,188 @@ async function onRecordChanged(record: Record) {
   }
 }
 
-const normalInputWidth = ref("125px");
-const remarkInputWidth = ref("250px");
-const normalInputLeftMargin = ref("12px");
-const editContainer = ref<HTMLElement>();
-
-function handleContainerWidth() {
-  const totalWidth =
-    editContainer.value?.offsetWidth ?? window.innerWidth * 0.5 - 48;
-  normalInputWidth.value = Math.min(260, (totalWidth - 2 * 24) / 3) + "";
-  if (normalInputWidth.value === "260") {
-    normalInputLeftMargin.value =
-      (totalWidth - Number(normalInputWidth.value) * 3) / 4 + "px";
-  } else {
-    normalInputLeftMargin.value = "12px";
-  }
-  remarkInputWidth.value =
-    parseInt(normalInputWidth.value) * 2 +
-    parseInt(normalInputLeftMargin.value) +
-    "";
-}
-
 onMounted(async () => {
   refreshData(currentFilter.value);
   // 初始化折叠状态
   collapsedIds.value = Array(records.value.length).fill(false);
-  window.addEventListener("resize", handleContainerWidth);
-  handleContainerWidth();
   registerNotify();
 });
 
 onUnmounted(() => {
-  window.removeEventListener("resize", handleContainerWidth);
   disableNotify();
 });
 </script>
 
 <style scoped>
 .records-container {
-  max-height: 620px;
-  overflow-y: auto;
+  height: calc(100vh - 336px);
+  /* overlay 滚动条不占布局宽度，列表卡片右边缘与上方卡片保持对齐 */
+  overflow-y: overlay;
   user-select: none !important;
 }
 
+.empty-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 430px);
+  min-height: 260px;
+}
+
 .empty-page {
-  max-height: 620px;
+  max-width: 300px;
+  max-height: 220px;
+  opacity: 0.9;
 }
 
 ul {
-  list-style-type: none; /* 移除列表项前的点 */
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
 }
 
 /* 定义折叠动画 */
 .collapse-enter-active,
 .collapse-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.25s ease;
 }
 .collapse-enter-from,
 .collapse-leave-to {
   opacity: 0;
-  transform: translateY(-20px);
+  transform: translateY(-12px);
 }
 
 .is-selected {
-  background-color: rgba(0, 0, 0, 0.05); /* 半透明的灰色遮罩 */
+  background-color: #f5f2fe;
+}
+
+.record-group {
+  background-color: white;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
+  margin-bottom: 8px;
+  overflow: hidden;
 }
 
 .daliy-container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 44px;
-  font-size: 18px;
+  height: 40px;
+  padding: 0 16px 0 8px;
+  background-color: #fafafc;
+  border-bottom: 1px solid #f2f3f6;
+  font-size: 13px;
+  cursor: pointer;
   user-select: none !important;
-}
-
-.record-group {
-  background-color: white;
-  border-radius: 10px;
-  margin: 12px 22px 12px 12px;
-}
-
-.left-daliy-icon {
-  width: 38px;
-  height: 24px;
 }
 
 .left-daliy {
   display: flex;
-  color: v-bind("Color.text");
   align-items: center;
+  gap: 4px;
+  color: #5a6274;
+  font-weight: 700;
+}
+
+.left-daliy-icon {
+  width: 24px;
+  height: 16px;
 }
 
 .right-daliy {
-  color: v-bind("Color.text");
-  font-size: 15px;
-}
-
-.right-daliy-expense {
-  color: v-bind("Color.delete");
-  margin-left: 10px;
-  padding-right: 36px;
+  display: flex;
+  align-items: baseline;
+  font-size: 12px;
+  color: #5a6274;
 }
 
 .right-daliy-income-title {
-  margin-left: 10px;
+  margin-left: 12px;
 }
 
 .right-daliy-income {
-  color: v-bind("Color.success");
-  margin-left: 10px;
+  margin-left: 6px;
+  font-weight: 700;
+  color: #18a472;
+  font-variant-numeric: tabular-nums;
+}
+
+.right-daliy-expense {
+  margin-left: 6px;
+  font-weight: 700;
+  color: #e2434f;
+  font-variant-numeric: tabular-nums;
+}
+
+.right-daliy-income.is-empty,
+.right-daliy-expense.is-empty {
+  color: #b9bdc7;
 }
 
 .record-cell {
-  font-size: 16px;
-  color: v-bind("Color.text");
-  height: 44px;
   display: flex;
   align-items: center;
-  border-top: 1px solid v-bind("Color.border");
-  user-select: none;
+  height: 40px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1b1f27;
+  border-top: 1px solid #f2f3f6;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.record-cell:hover {
+  background-color: #fafafc;
 }
 
 .record-item {
-  height: 44px;
-  border-left: 1px solid v-bind("Color.border");
-  padding-top: 10px;
-  overflow: hidden; /* 确保内容超出容器时被隐藏 */
-  white-space: nowrap; /* 保持内容在一行显示 */
-  text-overflow: ellipsis; /* 超出部分显示为省略号 */
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 12px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.record-item.align-right {
+  font-weight: 700;
+}
+
+.record-item > div {
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.align-left {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.align-center {
+  justify-content: center;
+  text-align: center;
+}
+
+.align-right {
+  justify-content: flex-end;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .select-record-container {
-  border-top: 1px solid v-bind("Color.border");
+  padding: 6px 0 10px;
+  background-color: #fafafb;
+  border-top: 1px solid #f2f3f6;
 }
 
 .select-record-cell {
-  height: 60px;
   display: flex;
   align-items: center;
+  height: 52px;
 }
 
 .select-record-action {
@@ -564,65 +607,61 @@ ul {
   align-items: center;
   justify-content: center;
   height: 100%;
-  border-left: 1px solid v-bind("Color.border");
-}
-
-.select-type-amount {
-  width: 100%;
-  display: flex;
-  align-items: center;
+  border-left: 1px solid #f2f3f6;
 }
 
 .select-record-item {
-  height: 60px;
-}
-
-.select-type-amount .first-button {
-  margin-right: 24px;
+  height: 52px;
 }
 
 .record-title {
-  font-size: 15px;
-  color: v-bind("Color.info");
-  background-color: white;
-  margin: 0px 22px 12px 12px;
-  border-radius: 10px;
   position: sticky;
-  top: 0; /* 从顶部0px的位置开始固定 */
-  z-index: 1000;
+  top: 0;
+  z-index: 2;
+  margin-bottom: 8px;
+  background-color: white;
+  border: 1px solid #ebecf0;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #5a6274;
 }
 
 .record-title-item {
-  height: 32px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-left: 1px solid v-bind("Color.border");
+  height: 36px;
+  padding: 0 12px;
+  font-weight: 600;
 }
 
 .record-category-item {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .record-category-item img {
-  width: 22px;
-  height: 22px;
-  margin-right: 12px;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
 }
 
-ul {
-  margin: 0;
-  padding: 0;
+.record-category-item > div {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .top-input-elements {
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 4px 12px;
 }
 
-.top-input-elements > * {
-  margin-left: v-bind("normalInputLeftMargin");
+.top-input-elements.input-row-two {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
 }
 </style>

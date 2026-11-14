@@ -1,6 +1,6 @@
 <template>
   <div class="timeline-container">
-    <div v-if="activities.length === 0">
+    <div v-if="activities.length === 0" class="empty-wrapper">
       <img class="empty-page" src="@/assets/empty_page.svg" />
     </div>
     <div class="timeline" v-else>
@@ -15,15 +15,33 @@
         </el-timeline-item>
       </el-timeline>
     </div>
-    <div class="detail-data" v-if="currentActivity">
-      <div class="detail-space"></div>
+    <div
+      class="detail-mask"
+      :class="{ 'is-open': currentActivity !== null }"
+      @click="closeDetail"></div>
+    <aside class="detail-drawer" :class="{ 'is-open': currentActivity !== null }">
+      <div class="detail-header">
+        <span class="detail-title">{{ L10n.detail }}</span>
+        <button
+          class="detail-close"
+          type="button"
+          aria-label="关闭详情"
+          @click="closeDetail">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path
+              d="M3.2 3.2l9.6 9.6M12.8 3.2l-9.6 9.6"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
       <div class="detail-container">
-        <div class="detail-title">{{ L10n.detail }}</div>
-        <span class="detail-text">
+        <span class="detail-text" v-if="currentActivity">
           {{ recordDetails(currentActivity.type, currentActivity.record) }}
         </span>
       </div>
-    </div>
+    </aside>
   </div>
 </template>
 
@@ -34,9 +52,14 @@ import L10n from "@/configs/L10n.json";
 import { generateTimeLineNodes, TimeLineNode, recordDetails } from "./Manager";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { ElMessage } from "element-plus";
+
 const activities = ref<TimeLineNode[]>([]);
 
 const currentActivity = ref<TimeLineNode | null>(null);
+
+function closeDetail() {
+  currentActivity.value = null;
+}
 
 function registerNotify() {
   notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, loadData);
@@ -80,79 +103,153 @@ onMounted(async () => {
 
 <style scoped>
 .timeline-container {
+  position: relative;
   display: flex;
   flex-direction: row;
-  width: 100% - 24px;
-  height: 100%;
-  background-color: white;
-  margin: 20px;
-  border-radius: 10px;
-}
-
-.timeline {
-  margin-top: 42px;
-  padding-left: 38px;
-  margin-bottom: 42px;
-  max-width: 600px;
-  text-align: left;
-  flex: 0.618;
-
-  max-height: 500px;
-  overflow-y: auto;
-}
-
-/* 隐藏滚动条的样式 */
-.timeline::-webkit-scrollbar {
-  display: none; /* 对于WebKit浏览器隐藏滚动条 */
-}
-
-/* IE和Edge */
-.timeline {
-  -ms-overflow-style: none;
-}
-
-/* Firefox */
-.timeline {
-  scrollbar-width: none;
-}
-
-.detail-data {
   width: 100%;
-  height: 100%;
-  margin-right: 36px;
-  margin-top: 12px;
-  flex: 0.382;
+  height: calc(100vh - 200px);
+  min-height: 520px;
+  padding: 8px 8px 8px 0;
+  overflow: hidden;
+  background-color: white;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
+}
+
+.empty-wrapper {
   display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-page {
+  max-height: 240px;
+  opacity: 0.9;
+}
+
+.timeline {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin: 16px 0;
+  padding: 8px 20px 8px 24px;
+  overflow-y: auto;
+  text-align: left;
+  scrollbar-width: thin;
+}
+
+.timeline :deep(.el-timeline) {
+  padding-left: 4px;
+}
+
+.timeline :deep(.el-timeline-item) {
+  padding-bottom: 18px;
+  cursor: pointer;
+}
+
+.timeline :deep(.el-timeline-item__timestamp) {
+  font-size: 12px;
+  color: #9aa0ad;
+}
+
+.timeline :deep(.el-timeline-item__content) {
+  font-size: 13px;
+  color: #4b5261;
+  line-height: 1.6;
+}
+
+.timeline::-webkit-scrollbar {
+  width: 6px;
+}
+
+/* 点击时间线节点后在卡片右侧滑出详情，点击遮罩（旁边空白处）收回 */
+.detail-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background-color: rgba(27, 31, 39, 0.1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
+}
+
+.detail-mask.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.detail-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, 42%);
+  padding: 14px 16px 16px;
+  background-color: #ffffff;
+  border-left: 1px solid #ebecf0;
+  border-radius: 0 12px 12px 0;
+  box-shadow: -12px 0 32px rgba(27, 31, 39, 0.08);
+  transform: translateX(calc(100% + 12px));
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detail-drawer.is-open {
+  transform: translateX(0);
+}
+
+.detail-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.detail-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: #5a6274;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.detail-close:hover {
+  color: #6c5dd3;
+  background-color: #efecfb;
 }
 
 .detail-container {
-  flex: 0.6;
-}
-
-.detail-space {
-  flex: 0.4;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .detail-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: v-bind("Color.primary");
-  background-color: v-bind("Color.border");
-  width: calc(100vh - 12);
-  border-radius: 2px;
-  margin-bottom: 12px;
-  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: #6e7686;
   text-align: left;
-  padding: 4px 0px 4px 12px;
 }
 
 .detail-text {
-  font-size: 16px;
-  color: v-bind("Color.text");
-  width: 300px;
+  width: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #4b5261;
   word-wrap: break-word;
-  overflow-wrap: break-word; /* 同上，更现代的属性名称 */
-  text-align: left; /* 确保文本左对齐 */
+  overflow-wrap: break-word;
+  text-align: left;
 }
 </style>
-./AnalysisManager @/configs/Color.json ./Manager

@@ -1,21 +1,21 @@
 <template>
   <div class="container">
-    <el-tabs v-model="activeName" class="container_tabs">
-      <el-tab-pane name="first">
+    <el-tabs v-model="activeName" class="analysis-tabs">
+      <el-tab-pane name="first" lazy>
         <template #label>
-          <span class="analyisis-title">{{ L10n.review }}</span>
+          <span class="analysis-title">{{ L10n.review }}</span>
         </template>
         <TotalData></TotalData>
       </el-tab-pane>
-      <el-tab-pane name="second">
+      <el-tab-pane name="second" lazy>
         <template #label>
-          <span class="analyisis-title">{{ L10n.yearly }}</span>
+          <span class="analysis-title">{{ L10n.yearly }}</span>
         </template>
         <YearlyData></YearlyData>
       </el-tab-pane>
-      <el-tab-pane name="third">
+      <el-tab-pane name="third" lazy>
         <template #label>
-          <span class="analyisis-title">{{ L10n.timeline }}</span>
+          <span class="analysis-title">{{ L10n.timeline }}</span>
         </template>
         <TimeLine></TimeLine>
       </el-tab-pane>
@@ -24,89 +24,77 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref } from "vue";
 import TotalData from "./TotalData.vue";
 import YearlyData from "./YearlyData.vue";
 import TimeLine from "./TimeLine.vue";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 
 const activeName = ref("first");
-const containerHeight = ref("700px");
-const containerWidth = ref("1000px");
-
-function handleContainerWidth() {
-  containerHeight.value = window.innerHeight - 120 + "px";
-  containerWidth.value = window.innerWidth - 184 + "px";
-}
-
-onMounted(() => {
-  window.addEventListener("resize", handleContainerWidth);
-  handleContainerWidth();
-});
-
-onUnmounted(() => {
-  window.removeEventListener("resize", handleContainerWidth);
-});
 </script>
 
 <style scoped>
-.analyisis-title {
-  font-size: 15;
-  font-weight: 700;
-  color: v-bind("Color.info");
-}
-
 .container {
-  height: v-bind("containerHeight");
-  overflow: auto !important;
+  height: 100%;
+  padding: 16px 24px 24px 16px;
+  overflow-y: auto;
 }
 
-/* 针对Webkit浏览器隐藏滚动条 */
-.container::-webkit-scrollbar {
+.analysis-tabs :deep(.el-tabs__header) {
+  margin: 0 0 12px;
+}
+
+.analysis-tabs :deep(.el-tabs__nav-wrap::after) {
   display: none;
 }
 
-/* 对于支持scrollbar-width属性的浏览器（如Firefox），也隐藏滚动条 */
-.container {
-  scrollbar-width: none;
+.analysis-tabs :deep(.el-tabs__active-bar) {
+  display: none;
 }
 
-.container_tabs > .el-tabs__content {
-  padding: 12px;
-  color: #6b778c;
-  background-color: white;
-  font-size: 32px;
-  font-weight: 600;
-}
-
-.el-tabs--right {
-  overflow-y: auto; /* 只在垂直方向上显示滚动条 */
-  overflow-x: hidden; /* 隐藏水平方向的滚动条 */
-}
-
-.el-tabs .el-tabs--top {
-  margin-top: 12px;
-}
-
-:deep(.el-tabs__header) {
-  margin-left: 20px !important;
-  margin-right: 20px !important;
-  width: v-bind("containerWidth");
+.analysis-tabs :deep(.el-tabs__nav) {
+  padding: 3px;
+  background-color: #eff0f4;
   border-radius: 8px;
 }
 
-:deep(.el-tabs__nav) {
-  margin-top: 4px !important;
+.analysis-tabs :deep(.el-tabs__item) {
+  height: 30px;
+  line-height: 30px;
+  margin-right: 2px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5a6274;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-:deep(.el-tabs__item) {
-  margin-left: 12px !important;
-  margin-bottom: 4px !important;
-  margin-right: 12px !important;
+.analysis-tabs :deep(.el-tabs__item:last-child) {
+  margin-right: 0;
 }
 
-:deep(.el-tabs__header) {
-  margin-bottom: 0px;
+/* Element Plus 会去掉首/末个 tab 的外侧内边距，这里补齐，保持分段控件左右对称 */
+.analysis-tabs :deep(.el-tabs__nav .el-tabs__item:nth-child(2)) {
+  padding-left: 14px;
+}
+
+.analysis-tabs :deep(.el-tabs__nav .el-tabs__item.is-top:last-child) {
+  padding-right: 14px;
+}
+
+.analysis-tabs :deep(.el-tabs__item.is-active) {
+  background-color: white;
+  color: #6c5dd3;
+  box-shadow: 0 1px 2px rgba(27, 31, 39, 0.08);
+}
+
+.analysis-tabs :deep(.el-tabs__content) {
+  overflow: visible;
+}
+
+.analysis-title {
+  font-size: 13px;
+  color: inherit;
 }
 </style>

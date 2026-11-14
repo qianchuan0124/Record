@@ -1,6 +1,12 @@
 const { defineConfig } = require("@vue/cli-service");
 module.exports = defineConfig({
   transpileDependencies: true,
+  devServer: {
+    client: {
+      // 关闭开发模式默认的全屏错误遮罩，改由应用内统一异常提示兜底
+      overlay: false,
+    },
+  },
   chainWebpack: (config) => {
     config.plugin("html").tap((args) => {
       args[0].title = "记账清单";

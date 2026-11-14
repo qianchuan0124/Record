@@ -2,9 +2,12 @@
   <div class="container">
     <div class="inner-container">
       <div class="container-top">
-        <div @click="feedbackVisible = true">
+        <button
+          class="feedback-trigger"
+          type="button"
+          @click="feedbackVisible = true">
           {{ L10n.update_and_feedback }}
-        </div>
+        </button>
       </div>
       <div class="container-bottom">
         <div class="container-left">
@@ -92,19 +95,15 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, onDeactivated, onUnmounted } from "vue";
+import { ref, onMounted, onDeactivated } from "vue";
 import DataHandle from "./DataHandle.vue";
 import CategoryCustom from "./CategoryCustom.vue";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import packageInfo from "@/../package.json";
 import { ElMessage } from "element-plus";
 import { IpcType } from "@/models/IpcResponse";
 import { logInfo } from "@/utils/DataCenter";
 import { info } from "@/configs/Info";
-
-const containerHeight = ref("700px");
-const containerWidth = ref("100px");
 
 const isLatestVersion = ref(true);
 const feedbackVisible = ref(false);
@@ -166,11 +165,6 @@ async function copyMailInfo() {
   ElMessage.success(L10n.copy_mail_to_clipboard);
 }
 
-function handleContainerWidth() {
-  containerHeight.value = window.innerHeight - 120 + "px";
-  containerWidth.value = window.innerWidth - 184 + "px";
-}
-
 onMounted(() => {
   window.electron.ipcRenderer.on(IpcType.UPDATE_AVAILABLE, (info) => {
     logInfo("receive update avaliable, version:" + info.version);
@@ -190,8 +184,6 @@ onMounted(() => {
     status.value = "install";
     ElMessage.success(L10n.new_version_download_success);
   });
-  window.addEventListener("resize", handleContainerWidth);
-  handleContainerWidth();
 });
 
 onDeactivated(() => {
@@ -199,122 +191,138 @@ onDeactivated(() => {
   window.electron.ipcRenderer.off(IpcType.DOWNLOAD_PROGRESS, () => {});
   window.electron.ipcRenderer.off(IpcType.UPDATE_DOWNLOADED, () => {});
 });
-
-onUnmounted(() => {
-  window.removeEventListener("resize", handleContainerWidth);
-});
 </script>
 
 <style scoped>
 .container {
-  height: v-bind("containerHeight");
-  overflow: auto !important;
-}
-
-/* 针对Webkit浏览器隐藏滚动条 */
-.container::-webkit-scrollbar {
-  display: none;
-}
-
-/* 对于支持scrollbar-width属性的浏览器（如Firefox），也隐藏滚动条 */
-.container {
-  scrollbar-width: none;
+  height: 100%;
+  padding: 16px 24px 24px 16px;
+  overflow-y: auto;
 }
 
 .inner-container {
-  margin: 20px;
-  padding: 20px 20px 20px 20px;
+  padding: 20px 24px 28px;
   background-color: white;
-  border-radius: 10px;
-  overflow: auto;
-  height: 700px;
-  width: 100% - 24px;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
   text-align: left;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .container-top {
   display: flex;
   justify-content: flex-end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f2f3f6;
+}
+
+.feedback-trigger {
+  height: 30px;
+  padding: 0 12px;
+  background-color: white;
+  color: #5a6274;
+  border: 1px solid #e3e5ea;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.feedback-trigger:hover {
+  border-color: #c9c3ee;
+  color: #6c5dd3;
 }
 
 .container-bottom {
   display: flex;
+  gap: 48px;
   min-height: 480px;
-  overflow-y: auto;
+  padding-top: 20px;
 }
 
 .container-left {
-  flex: 0.382;
-  margin-left: 20px;
+  flex: 0 0 320px;
 }
 
 .container-right {
-  flex: 0.618;
+  flex: 1;
+  min-width: 0;
   text-align: left;
 }
 
 .text-title {
-  font-size: 20px;
-  color: v-bind("Color.text");
-  padding-top: 20px;
-  padding-bottom: 20px;
+  padding: 0 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1b1f27;
 }
 
 .top-updater {
   display: flex;
-  margin-bottom: 24px;
+  align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background-color: #fafafb;
+  border: 1px solid #f2f3f6;
+  border-radius: 10px;
 }
 
 .left-info {
   display: flex;
+  align-items: center;
   flex-direction: row;
-  align-items: left;
 }
 
 .left-info img {
-  width: 42px;
-  height: 42px;
-  margin-right: 16px;
+  width: 36px;
+  height: 36px;
+  margin-right: 14px;
 }
 
 .title-info {
-  font-size: 16px;
-  font-weight: bold;
-  color: v-bind("Color.text");
+  font-size: 14px;
+  font-weight: 600;
+  color: #1b1f27;
 }
 
 .version-info {
+  margin-top: 2px;
   font-size: 12px;
-  margin-top: 5px;
-  color: v-bind("Color.info");
+  color: #9aa0ad;
 }
 
 .feed-back {
   display: flex;
   flex-direction: column;
+  gap: 4px;
 }
 
 .feed-back span {
-  font-size: 13px;
-  font-weight: bold;
-  color: v-bind("Color.delete");
+  font-size: 12px;
+  color: #b26a00;
 }
 
 .feed-back .back-button {
-  margin-top: 12px;
+  align-self: flex-start;
+  margin-top: 8px;
 }
 
 .open-action {
   display: flex;
   flex-direction: row;
-  justify-content: space-evenly;
-  margin-bottom: 36px;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .open-action > * {
-  flex-grow: 0.5;
+  flex: 1;
+}
+
+.open-action .el-button + .el-button {
+  margin-left: 0;
 }
 
 .update-progress {
@@ -327,6 +335,6 @@ onUnmounted(() => {
 }
 
 .inner-info-url {
-  margin-bottom: 4px;
+  margin: 0 4px;
 }
 </style>

@@ -218,7 +218,6 @@ import {
   exportAllData,
 } from "./Manager";
 import * as XLSX from "xlsx";
-import Color from "@/configs/Color.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { logError } from "@/utils/DataCenter";
 import { IpcType } from "@/models/IpcResponse";
@@ -390,61 +389,104 @@ const svg = `
 .export-data {
   display: flex;
   flex-direction: column;
-  width: 210px;
-  margin-top: 12px;
+  width: 100%;
+  max-width: 300px;
+}
+
+.export-data .el-button {
+  width: 100%;
+  height: 34px;
+}
+
+.upload-container {
+  width: 100%;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #f2f3f6;
 }
 
 .upload-file {
   display: flex;
-  width: 280px;
-  height: 300px;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
   text-align: left;
 }
 
 .upload-select {
-  width: 210px;
-  height: 200px;
+  width: 300px;
 }
 
-.upload-container {
-  margin-top: 64px;
-  width: 380px;
+.upload-select :deep(.el-upload-dragger) {
+  padding: 20px 12px;
+  background-color: #fafafb;
+  border: 1px dashed #e3e5ea;
+  border-radius: 8px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.upload-select :deep(.el-upload-dragger:hover) {
+  border-color: #c9c3ee;
+  background-color: #fafafe;
+}
+
+.upload-select :deep(.el-icon--upload) {
+  margin-bottom: 8px;
+  font-size: 36px;
+  color: #b9bdc7;
+}
+
+.upload-select :deep(.el-upload__text) {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #5a6274;
+}
+
+.upload-select :deep(.el-upload__tip) {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #9aa0ad;
 }
 
 .upload-info {
-  margin-top: 174px;
-  height: 300px;
-  margin-left: 12px;
-  align-items: flex-end;
+  display: flex;
+  align-items: center;
+  margin-top: 8px;
 }
 
 .data-title {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6e7686;
 }
 
 .table-title {
-  height: 24px;
-  padding-top: 6px;
-  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1.2fr 1fr 1.6fr;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background-color: #fafafc;
+  border: 1px solid #f2f3f6;
+  border-radius: 6px;
 }
 
 .table-title span {
-  background-color: v-bind("Color.border");
-  font-size: 15px;
-  padding: 4px 12px 4px 12px;
-  border-top: 1px solid v-bind("Color.info");
-  border-right: 1px solid v-bind("Color.info");
-  border-bottom: 1px solid v-bind("Color.info");
-}
-
-.table-title span:first-child {
-  border-left: 1px solid v-bind("Color.info");
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: #6e7686;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .import-tip {
+  display: block;
+  margin-bottom: 12px;
   font-size: 12px;
-  font-weight: 800;
-  color: v-bind("Color.delete");
+  font-weight: 400;
+  color: #b26a00;
 }
 
 .sync-info {
@@ -458,10 +500,10 @@ const svg = `
 }
 
 .sync-title {
-  font-size: 24px;
-  font-weight: bold;
-  color: v-bind("Color.text");
   margin-bottom: 12px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #1b1f27;
 }
 
 .sync-start-left {
@@ -475,23 +517,23 @@ const svg = `
 }
 
 .setp-content {
-  font-size: 16px;
-  color: v-bind("Color.text");
-  margin-bottom: 6px;
   margin-top: 6px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: #4b5261;
 }
 
 .el-link {
-  font-size: 16px;
+  font-size: 14px;
   margin-bottom: 6px;
 }
 
 .sync-data {
-  margin-top: 12px;
+  margin-top: 16px;
 }
 
 .sync-data-enter {
-  width: 210px;
+  width: 100%;
 }
 
 .el-button + .el-button {

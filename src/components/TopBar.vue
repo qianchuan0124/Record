@@ -1,124 +1,125 @@
 <template>
-  <el-row class="row-bg top" justify="space-between">
-    <el-col :span="5" class="container">
-      <img class="logo-img" src="@/assets/logo.svg" />
-      <label class="title">{{ L10n.record_list }}</label>
-    </el-col>
-    <el-col :span="16"></el-col>
-
-    <el-col :span="3">
-      <el-popover
-        class="hover-container"
-        :width="460"
-        popper-style="box-shadow: rgb(14 18 22 / 35%) 0px 10px 38px -10px, rgb(14 18 22 / 20%) 0px 10px 20px -15px; padding: 20px; margin-left: -20px;">
-        <template #reference>
-          <h3>{{ L10n.moblie_client }}</h3>
-        </template>
-        <template #default>
-          <div class="qrcode_display">
-            <div class="qrcode_display_item">
-              <h3>{{ L10n.andorid_download }}</h3>
-              <img src="@/assets/qrcode/qrcode_android.png" />
-            </div>
-            <div class="qrcode_display_item">
-              <h3>{{ L10n.ios_download }}</h3>
-              <img src="@/assets/qrcode/qrcode_ios.png" />
-            </div>
-          </div>
-        </template>
-      </el-popover>
-    </el-col>
-  </el-row>
+  <div class="top-bar">
+    <div class="brand">
+      <img class="brand-logo" src="@/assets/logo.svg" draggable="false" />
+      <span class="brand-title">{{ L10n.record_list }}</span>
+    </div>
+    <el-popover
+      :width="420"
+      trigger="hover"
+      placement="bottom-end"
+      popper-class="mobile-popover">
+      <template #reference>
+        <button class="mobile-trigger" type="button">
+          {{ L10n.moblie_client }}
+        </button>
+      </template>
+      <div class="qrcode_display">
+        <div class="qrcode_display_item">
+          <h3>{{ L10n.andorid_download }}</h3>
+          <img src="@/assets/qrcode/qrcode_android.png" />
+        </div>
+        <div class="qrcode_display_item">
+          <h3>{{ L10n.ios_download }}</h3>
+          <img src="@/assets/qrcode/qrcode_ios.png" />
+        </div>
+      </div>
+    </el-popover>
+  </div>
 </template>
 
 <script setup>
-import Color from "@/configs/Color.json";
-import { onDeactivated, onMounted, onUnmounted, ref } from "vue";
 import L10n from "@/configs/L10n.json";
-
-const containerWidth = ref("1200px");
-function handleContainerWidth() {
-  containerWidth.value = window.innerWidth + "px";
-}
-
-onMounted(() => {
-  window.addEventListener("resize", handleContainerWidth);
-  handleContainerWidth();
-});
-
-onUnmounted(() => {
-  window.removeEventListener("resize", handleContainerWidth);
-});
-
-onDeactivated(() => {
-  window.removeEventListener("resize", handleContainerWidth);
-});
 </script>
 
 <style scoped>
-.hover-container {
-  margin-right: -124px;
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 60px;
+  padding: 0 24px;
+  background-color: white;
+  border-bottom: 1px solid #ebecf0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  /* 品牌区图标与标题不允许被选中或拖拽选中 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.brand-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.6px;
+  color: #1b1f27;
+  user-select: none;
+}
+
+.mobile-trigger {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background-color: transparent;
+  color: #8a90a2;
+  font-size: 12px;
+  line-height: 20px;
+  letter-spacing: 0.2px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.mobile-trigger:hover {
+  background-color: transparent;
+  color: #6c5dd3;
 }
 
 .qrcode_display {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   flex-direction: row;
 }
 
 .qrcode_display_item {
   display: flex;
   flex-direction: column;
+  align-items: center;
 }
 
 .qrcode_display_item h3 {
-  margin-left: 12px;
+  margin: 0 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5a6274;
 }
 
 .qrcode_display_item img {
-  width: 200px;
-  height: 200px;
+  width: 180px;
+  height: 180px;
 }
+</style>
 
-.logo-img {
-  width: 84px;
-  height: 84px;
-  margin-left: 32px;
-}
-
-.top {
-  height: 72px;
-  background-color: white;
-  margin-bottom: 20px;
-  width: v-bind("containerWidth");
-}
-
-.title {
-  font-size: 30px;
-  font-weight: bold;
-  color: #000000;
-  margin-left: 10px;
-}
-
-.container {
-  display: flex;
-  align-items: center; /* 垂直居中对齐 */
-  height: 60px;
-  margin: 5px 0px 10px 0px;
-}
-
-.container img {
-  width: 42;
-  height: 42;
-  margin-left: 32px;
-}
-
-input:focus {
-  outline: none; /* 移除聚焦时的边框 */
-}
-
-input::placeholder {
-  color: v-bind("Color.info"); /* 设置占位符文本颜色 */
-  font-size: 16px;
+<style>
+.mobile-popover.el-popover {
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #ebecf0;
+  box-shadow: 0 12px 32px rgba(27, 31, 39, 0.12);
 }
 </style>

@@ -1,12 +1,11 @@
 <!-- 可以上下滚动无限选择月份的选择器 -->
 <template>
   <div class="month-select">
-    <div class="month-select__mask"></div>
     <div class="month-title">
       <span>{{ selectedYear }}</span>
     </div>
     <div class="month-title-divider"></div>
-    <div v-if="isLoaded">
+    <div v-if="isLoaded" class="month-list">
       <ul
         v-infinite-scroll="load"
         direction="top"
@@ -22,9 +21,8 @@
           <div v-if="isLastMonthOfYear(month.date)" class="year-bar">
             {{ getYearFromMonth(month.date) }}
           </div>
-          <div class="month-single">
+          <div class="month-single" :class="{ 'is-selected': index === isSelected }">
             <div class="month-bar" v-if="index === isSelected"></div>
-            <div class="month-bar-non" v-else></div>
             <div class="month-wrapper">
               <div class="month-left">
                 <div v-if="month.isCurrent" class="month-current">
@@ -36,10 +34,10 @@
                 </div>
               </div>
               <div class="month-right">
-                <div class="month-income">
+                <div class="month-income" :class="{ 'is-empty': month.totalIncome === 0 }">
                   <span>+{{ month.totalIncome.toFixed(2) }}</span>
                 </div>
-                <div class="month-expense">
+                <div class="month-expense" :class="{ 'is-empty': month.totalExpense === 0 }">
                   <span>-{{ month.totalExpense.toFixed(2) }}</span>
                 </div>
               </div>
@@ -48,7 +46,7 @@
         </li>
       </ul>
     </div>
-    <div v-else>
+    <div v-else class="month-skeleton">
       <el-skeleton :rows="8" animated />
     </div>
   </div>
@@ -71,7 +69,6 @@ import {
   fetchTotalAmountByMonth,
 } from "./managers/MonthManager";
 import L10n from "@/configs/L10n.json";
-import Color from "@/configs/Color.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { ElMessage } from "element-plus";
 //  获取今年、明年、去年的月份数据
@@ -231,19 +228,35 @@ onUnmounted(() => {
 
 <style scoped>
 .month-select {
-  margin-left: 23px;
-  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  width: 220px;
+  height: calc(100vh - 336px);
+  min-height: 320px;
   background-color: white;
-  width: 200px;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
+  overflow: hidden;
   user-select: none !important;
 }
 
+.month-list {
+  flex: 1;
+  min-height: 0;
+}
+
 .infinite-list {
-  max-height: 620px;
+  height: 100%;
   padding: 0;
   margin: 0;
   list-style: none;
+  scrollbar-width: none;
 }
+
+.infinite-list::-webkit-scrollbar {
+  display: none;
+}
+
 .infinite-list .infinite-list-item {
   display: flex;
   flex-direction: column;
@@ -252,116 +265,137 @@ onUnmounted(() => {
 }
 
 .infinite-list .infinite-list-item:not(:last-child) {
-  border-bottom: 1px solid v-bind("Color.border"); /* 灰色分割线 */
+  border-bottom: 1px solid #f2f3f6;
 }
 
 .month-title {
-  font-size: 18px;
-  color: v-bind("Color.text");
-  width: 164px;
-  padding: 8px 0px 8px 24px;
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1b1f27;
   text-align: left;
-  user-select: none !important;
 }
 
 .month-title-divider {
-  height: 10px;
-  background-color: v-bind("Color.border");
+  height: 1px;
+  background-color: #ebecf0;
 }
 
 .year-bar {
   width: 100%;
+  padding: 4px 0;
   text-align: center;
-  background-color: v-bind("Color.border");
-  color: v-bind("Color.text");
-  font-size: 18px;
-  padding: 3px 0;
-  margin-bottom: 5px;
+  background-color: #f7f7fa;
+  color: #5a6274;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.8px;
 }
 
 .month-single {
-  width: 200px;
-  height: 100px;
   display: flex;
-  align-items: center;
+  align-items: stretch;
+  width: 100%;
+  height: 70px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.month-single:hover {
+  background-color: #fafafc;
+}
+
+.month-single.is-selected {
+  background-color: #f3f0fd;
 }
 
 .month-wrapper {
   display: flex;
-  justify-content: center;
   align-items: center;
-  width: calc(100%); /* 减去.month-bar的宽度 */
-  height: 100%; /* 使内容容器高度与.month-single一致 */
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 14px;
 }
 
 .month-bar {
-  width: 5px; /* 横条宽度 */
+  flex: 0 0 3px;
+  width: 3px;
+  height: 100%;
   background-color: #6c5dd3;
-  height: 100%;
+  border-radius: 0 3px 3px 0;
 }
 
-.month-bar-non {
-  width: 5px; /* 横条宽度 */
-  background-color: rgba(255, 255, 255, 0); /* 完全透明 */
-  height: 100%;
+.month-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
 
-.month-left,
 .month-right {
-  flex: 1; /* 让两个元素平分可用空间 */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  margin-left: auto;
 }
 
 .month-current {
-  font-size: 12px;
-  color: v-bind("Color.info");
-  margin-left: 8px;
+  width: fit-content;
+  padding: 0 6px;
+  border-radius: 999px;
+  background-color: #efecfb;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  color: #6c5dd3;
 }
 
 .month-content {
-  font-size: 27px;
-  font-weight: bold;
-  color: v-bind("Color.text");
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #1b1f27;
+  font-variant-numeric: tabular-nums;
 }
 
 .month-unit {
-  font-size: 15px;
-  color: v-bind("Color.text");
+  margin-left: 2px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #7e8697;
+}
+
+.month-income,
+.month-expense {
+  width: auto;
+  height: auto;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .month-income {
-  font-size: 12px;
-  color: v-bind("Color.success");
-  height: 34px;
-  width: 70px;
-  display: flex;
-  align-items: center; /* 使文本垂直居中 */
-  justify-content: flex-end; /* 使文本水平靠右对齐 */
-  text-align: right;
+  color: #18a472;
 }
 
 .month-expense {
-  font-size: 12px;
-  color: v-bind("Color.delete");
-  height: 34px;
-  width: 70px;
-  display: flex;
-  align-items: center; /* 使文本垂直居中 */
-  justify-content: flex-end; /* 使文本水平靠右对齐 */
-  text-align: right;
+  color: #e2434f;
 }
 
-::-webkit-scrollbar {
-  display: none; /* 针对Webkit浏览器 */
+.month-income.is-empty,
+.month-expense.is-empty {
+  color: #b9bdc7;
 }
 
-/* 对于Firefox */
-* {
-  scrollbar-width: none; /* 隐藏滚动条 */
-}
-
-/* 对于IE和Edge */
-* {
-  -ms-overflow-style: none; /* 隐藏滚动条 */
+.month-skeleton {
+  flex: 1;
+  padding: 12px;
+  overflow: hidden;
 }
 </style>
-./managers/MonthManager @/configs/L10n.json@/configs/Color.json
+

@@ -1,7 +1,7 @@
 <template>
   <div class="custom-category">
     <el-tree
-      style="width: 50% - 24px"
+      style="width: 100%"
       :allow-drop="allowDrop"
       :allow-drag="allowDrag"
       :expand-on-click-node="false"
@@ -14,31 +14,31 @@
       <template #default="{ node, data }">
         <span class="custom-tree-node">
           <span>{{ node.label }}</span>
-          <span>
-            <a @click="confrimAppend(data)" v-if="data.level !== 2">
+          <span class="node-actions">
+            <a class="node-action" @click="confrimAppend(data)" v-if="data.level !== 2">
               {{ L10n.add_sub_category }}
             </a>
 
             <a
-              style="margin-left: 8px"
+              class="node-action danger"
               @click="remove(node, data)"
               v-if="data.level !== 0">
               {{ L10n.delete }}
             </a>
             <a
-              style="margin-left: 8px"
+              class="node-action"
               @click="confirmSave(node, data)"
               v-if="data.level === 0">
               {{ L10n.save }}
             </a>
             <a
-              style="margin-left: 8px"
+              class="node-action"
               @click="confirmRestore()"
               v-if="data.level === 0">
               {{ L10n.recover }}
             </a>
             <a
-              style="margin-left: 8px"
+              class="node-action"
               @click="confirmReDefault()"
               v-if="data.level === 0">
               {{ L10n.default }}
@@ -86,7 +86,6 @@ import { CategorySettingNode } from "@/models/CategorySettingNode";
 import { saveCustomCategory } from "@/utils/DataCenter";
 import { ElMessage } from "element-plus";
 import cloneDeep from "lodash/cloneDeep";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import { updateCurrentCategory } from "@/configs/CategoryParser";
 const addFormVisible = ref(false);
@@ -281,21 +280,65 @@ const allowDrop = (draggingNode: Node, dropNode: Node, type: AllowDropType) => {
 
 <style>
 .custom-tree-node {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 14px;
+  flex: 1;
+  gap: 12px;
   padding-right: 8px;
+  font-size: 13px;
+}
+
+.node-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.custom-tree-node:hover .node-actions,
+.custom-tree-node:focus-within .node-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.node-action {
+  font-size: 12px;
+  color: #6c5dd3;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.node-action:hover {
+  text-decoration: underline;
+}
+
+.node-action.danger {
+  color: #e2434f;
 }
 
 .custom-category {
+  width: 100%;
   height: 500px;
-  width: 50% - 24px;
-  max-width: 600px;
-  padding: 12px;
-  border: 1px solid v-bind("Color.border"); /* 设置边框样式 */
-  border-radius: 10px; /* 设置圆角边框 */
+  padding: 8px;
+  border: 1px solid #ebecf0;
+  border-radius: 10px;
   overflow-y: auto;
+}
+
+.custom-category .el-tree {
+  background: transparent;
+}
+
+.custom-category .el-tree-node__content {
+  height: 32px;
+  border-radius: 6px;
+}
+
+.custom-category .el-tree-node__content:hover {
+  background-color: #f6f6f9;
 }
 </style>

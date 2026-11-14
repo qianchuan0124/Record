@@ -1,59 +1,54 @@
 <template>
   <div class="filter-table-container">
-    <el-row class="filter-table">
-      <el-col :span="7" class="filter-list-left">
+    <div class="filter-header">
+      <div class="filter-header-left">
         <span class="filter-title">{{ L10n.bill_list }}</span>
         <span class="filter-title-time">{{ displayDate }}</span>
-      </el-col>
-      <el-col :span="5"></el-col>
-      <el-col :span="11" class="filter-list-right">
-        <span class="filter-item-title">{{ L10n.all_income }}</span>
-        <span class="filter-item-income">{{ income }}</span>
-        <span class="filter-item-reamin-units span-divider">|</span>
-        <span class="filter-item-title">{{ L10n.all_expense }}</span>
-        <span class="filter-item-expend">{{ expend }}</span>
-        <span class="filter-item-reamin-units span-divider">|</span>
-        <span class="filter-item-title">{{ L10n.remain }}</span>
-        <span class="filter-item-remain">{{ remain }}</span>
-        <span class="filter-item-reamin-units">{{ L10n.bill_unit }}</span>
-      </el-col>
-    </el-row>
-    <el-row class="filter-table filter-items">
-      <el-col :span="12">
-        <div class="filter-button-list">
-          <FilterButton
-            button-type="all"
-            @is-all="handleClickAll"></FilterButton>
-          <FilterButton
-            button-type="category"
-            ref="categoryFilter"
-            @update:category="handleCategoryUpdate"></FilterButton>
-          <FilterButton
-            button-type="type"
-            ref="typeFilter"
-            @update:type="handleTypeUpdate"></FilterButton>
-          <FilterButton
-            button-type="time"
-            ref="timeFilter"
-            @update:time="handleTimeUpdate"></FilterButton>
+      </div>
+      <div class="filter-summary">
+        <div class="summary-item">
+          <span class="summary-label">{{ L10n.all_income }}</span>
+          <span class="summary-value summary-income">{{ income }}</span>
         </div>
-      </el-col>
-      <el-col :span="5"></el-col>
-      <el-col :span="7">
-        <div class="remark-filter">
-          <FilterButton
-            button-type="remark"
-            ref="remarkFilter"
-            @update:remark="handleRemarkUpdate"></FilterButton>
+        <div class="summary-item">
+          <span class="summary-label">{{ L10n.all_expense }}</span>
+          <span class="summary-value summary-expend">{{ expend }}</span>
         </div>
-      </el-col>
-    </el-row>
+        <div class="summary-item">
+          <span class="summary-label">{{ L10n.remain }}</span>
+          <span class="summary-value">{{ remain }}</span>
+        </div>
+        <span class="summary-unit">{{ L10n.bill_unit }}</span>
+      </div>
+    </div>
+    <div class="filter-toolbar">
+      <div class="filter-button-list">
+        <FilterButton button-type="all" @is-all="handleClickAll"></FilterButton>
+        <FilterButton
+          button-type="category"
+          ref="categoryFilter"
+          @update:category="handleCategoryUpdate"></FilterButton>
+        <FilterButton
+          button-type="type"
+          ref="typeFilter"
+          @update:type="handleTypeUpdate"></FilterButton>
+        <FilterButton
+          button-type="time"
+          ref="timeFilter"
+          @update:time="handleTimeUpdate"></FilterButton>
+      </div>
+      <div class="remark-filter">
+        <FilterButton
+          button-type="remark"
+          ref="remarkFilter"
+          @update:remark="handleRemarkUpdate"></FilterButton>
+      </div>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import FilterButton from "@/components/utils/FilterButton.vue";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import {
   ref,
@@ -256,100 +251,97 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-span {
-  user-select: none;
-}
-
 .filter-table-container {
-  margin: 5px 22px 12px 22px;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 16px 20px;
   background-color: white;
-  border-radius: 10px;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
   user-select: none !important;
 }
 
-.filter-table {
-  margin-top: 20px;
+.filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.filter-items {
-  margin-left: 10px;
-  padding-bottom: 12px;
+.filter-header-left {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
 }
 
 .filter-title {
-  font-size: 24px;
-  color: v-bind("Color.text");
+  font-size: 15px;
+  font-weight: 700;
+  color: #1b1f27;
+  white-space: nowrap;
 }
 
 .filter-title-time {
-  font-size: 14px;
-  font-weight: bold;
-  margin-left: 10px;
-  color: v-bind("Color.text");
+  font-size: 12px;
+  color: #5a6274;
+  white-space: nowrap;
 }
 
-.filter-list-left {
-  text-align: left;
-  margin-left: 10px;
-}
-
-.filter-list-right {
-  text-align: right;
-  margin-right: 10px;
-}
-
-.filter-item-title {
-  font-size: 14px;
-  font-weight: bold;
-  color: v-bind("Color.text");
-}
-
-.filter-item-income {
-  font-size: 16px;
-  font-weight: bold;
-  margin-left: 10px;
-  color: v-bind("Color.success");
-}
-
-.filter-item-expend {
-  font-size: 16px;
-  font-weight: bold;
-  margin-left: 10px;
-  color: v-bind("Color.delete");
-}
-
-.filter-item-remain {
-  font-size: 16px;
-  font-weight: bold;
-  margin-left: 10px;
-  color: v-bind("Color.info");
-}
-
-.filter-item-reamin-units {
-  font-size: 14px;
-  font-weight: bold;
-  margin-left: 10px;
-  color: v-bind("Color.info");
-}
-
-.span-divider {
-  margin-left: 10px;
-  margin-right: 10px;
-}
-
-.remark-filter {
+.filter-summary {
   display: flex;
-  justify-content: flex-end;
-  margin-right: 36px;
+  align-items: baseline;
+  gap: 20px;
+}
+
+.summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.summary-label {
+  font-size: 12px;
+  color: #5a6274;
+}
+
+.summary-value {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #1b1f27;
+}
+
+.summary-income {
+  color: #18a472;
+}
+
+.summary-expend {
+  color: #e2434f;
+}
+
+.summary-unit {
+  font-size: 12px;
+  color: #7e8697;
+}
+
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 14px;
 }
 
 .filter-button-list {
   display: flex;
   flex-direction: row;
-  justify-content: flex-start;
+  gap: 8px;
 }
 
-.filter-button-list > * {
-  margin-right: 24px;
+.remark-filter {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

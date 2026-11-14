@@ -1,15 +1,34 @@
 <template>
   <div class="total-data">
-    <div v-if="isEmpty">
+    <div v-if="isEmpty" class="empty-wrapper">
       <img class="empty-page" src="@/assets/empty_page.svg" />
     </div>
     <div ref="myEchart" class="chart"></div>
-    <div class="detail-data" v-if="data.length !== 0">
-      <div class="detail-container">
-        <div class="detail-title">{{ L10n.detail }}</div>
-        <el-tree-v2 :data="data" :props="props" :height="550">
+    <div
+      class="detail-mask"
+      :class="{ 'is-open': detailVisible }"
+      @click="closeDetail"></div>
+    <aside class="detail-drawer" :class="{ 'is-open': detailVisible }">
+      <div class="detail-header">
+        <span class="detail-title">{{ L10n.detail }}</span>
+        <button
+          class="detail-close"
+          type="button"
+          aria-label="关闭详情"
+          @click="closeDetail">
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+            <path
+              d="M3.2 3.2l9.6 9.6M12.8 3.2l-9.6 9.6"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+      <div class="detail-container" ref="detailPanel">
+        <el-tree-v2 :data="data" :props="props" :height="treeHeight">
           <template #default="{ data }">
-            <div v-if="data.level === 0">
+            <div v-if="data.level === 0" class="tree-row">
               <div class="category-level">
                 <span class="category-level-left">
                   {{ data.label }}
@@ -19,7 +38,7 @@
                 </span>
               </div>
             </div>
-            <div v-else-if="data.level === 1">
+            <div v-else-if="data.level === 1" class="tree-row">
               <div class="sub-category-level">
                 <span class="sub-category-level-left">
                   {{ data.label }}
@@ -29,7 +48,7 @@
                 </span>
               </div>
             </div>
-            <div v-else-if="data.level === 2">
+            <div v-else-if="data.level === 2" class="tree-row">
               <el-tooltip
                 class="box-item"
                 effect="dark"
@@ -53,13 +72,12 @@
           </template>
         </el-tree-v2>
       </div>
-      <div class="detail-space"></div>
-    </div>
+    </aside>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, onDeactivated, onUnmounted } from "vue";
+import { onMounted, ref, onDeactivated, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
 import { generateCatgeoryNode, CategoryNode } from "./Manager";
 import {
@@ -67,21 +85,85 @@ import {
   logError,
   logInfo,
 } from "@/utils/DataCenter";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { ElMessage } from "element-plus";
 const myEchart = ref<HTMLElement | null>(null);
 const myChart = ref<echarts.ECharts | null>(null);
 const isEmpty = ref(true);
-onMounted(async () => {
-  myChart.value = echarts.init(myEchart.value as HTMLDivElement);
-  await loadData();
+// 详情树高度按容器实时高度计算，避免固定 550px 超出卡片被裁
+const detailPanel = ref<HTMLElement | null>(null);
+const treeHeight = ref(420);
+// 详情改为侧边滑出，不常驻占位
+const detailVisible = ref(false);
+
+function closeDetail() {
+  detailVisible.value = false;
+}
+
+function updateTreeHeight() {
+  const el = detailPanel.value;
+  if (!el) {
+    return;
+  }
+  treeHeight.value = Math.max(180, el.clientHeight);
+}
+
+let chartObserver: IntersectionObserver | null = null;
+let chartWidth = 0;
+let chartHeight = 0;
+
+// 容器被隐藏时尺寸为 0，跳过重绘，等可见后再调整
+function resizeChart() {
+  const el = myEchart.value;
+  if (!el || el.clientWidth === 0 || el.clientHeight === 0) {
+    return;
+  }
+  updateTreeHeight();
+  // 尺寸没变化时无需重绘，避免页签切换瞬间触发的无效更新
+  if (el.clientWidth === chartWidth && el.clientHeight === chartHeight) {
+    return;
+  }
+  chartWidth = el.clientWidth;
+  chartHeight = el.clientHeight;
+  myChart.value?.resize();
+}
+function setupChart(): boolean {
+  const el = myEchart.value;
+  if (!el || el.clientWidth === 0 || el.clientHeight === 0) {
+    return false;
+  }
+  myChart.value = echarts.init(el);
+  chartWidth = el.clientWidth;
+  chartHeight = el.clientHeight;
+  window.addEventListener("resize", resizeChart);
+  loadData();
   myChart.value.on("click", function (params) {
     logInfo("TotalData click" + params);
     reloadDetailValues(params.name);
   });
   registerNotify();
+  return true;
+}
+
+onMounted(() => {
+  const el = myEchart.value;
+  if (!el) {
+    return;
+  }
+  setupChart();
+  // 首次显示时初始化，之后每次显示时按新尺寸重绘
+  chartObserver = new IntersectionObserver((entries) => {
+    if (!entries.some((entry) => entry.isIntersecting)) {
+      return;
+    }
+    if (!myChart.value) {
+      setupChart();
+    } else {
+      resizeChart();
+    }
+  });
+  chartObserver.observe(el);
 });
 
 function registerNotify() {
@@ -100,15 +182,23 @@ function disableNotify() {
 
 onDeactivated(() => {
   disableNotify();
+  closeDetail();
 });
 
 onUnmounted(() => {
   disableNotify();
+  chartObserver?.disconnect();
+  window.removeEventListener("resize", resizeChart);
+  myChart.value?.dispose();
+  myChart.value = null;
 });
 
 async function reloadDetailValues(category: string) {
   try {
     data.value = [await generateCatgeoryNode(category)];
+    detailVisible.value = true;
+    await nextTick();
+    updateTreeHeight();
   } catch (error) {
     if (error instanceof Error) {
       ElMessage.error(error.message);
@@ -123,10 +213,19 @@ async function loadData() {
     const totalData = await fetchTotalCategorysAmount();
     isEmpty.value = totalData.length === 0;
     const option = {
-      title: {
-        text: isEmpty.value ? "" : L10n.review,
-        left: "center",
-      },
+      color: [
+        "#6c5dd3",
+        "#8b7fdf",
+        "#18a472",
+        "#f0a93b",
+        "#4c9be8",
+        "#e2434f",
+        "#59c3c3",
+        "#8a90a2",
+        "#b7aef0",
+        "#d8a7b1",
+        "#7fbf7f",
+      ],
       tooltip: {
         trigger: "item",
         formatter: "{a} <br/>{b} : {c} ({d}%)",
@@ -179,114 +278,164 @@ const data = ref<CategoryNode[]>([]);
 </script>
 <style scoped>
 .total-data {
+  position: relative;
   display: flex;
-  align-items: top;
-  width: 100% - 24px;
-  height: 700px;
+  align-items: stretch;
+  width: 100%;
+  height: calc(100vh - 200px);
+  min-height: 520px;
+  padding: 8px 20px 12px 8px;
+  overflow: hidden;
   background-color: white;
-  margin: 20px;
-  border-radius: 10px;
-}
-.chart {
-  flex: 0.618;
-  margin-top: 12px;
-  margin-left: 24px;
-  width: 600px;
-  height: 580px;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
 }
 
-.detail-data {
-  max-width: 100% - 700px;
-  height: 100%;
-  margin-right: 12px;
-  margin-top: 12px;
-  flex: 0.382;
+.empty-wrapper {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
   display: flex;
-  animation: fadeIn 1s ease-out;
-}
-
-.detail-space {
-  flex: 0.2;
-}
-
-.detail-container {
-  flex: 0.8;
-}
-
-.detail-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: v-bind("Color.primary");
-  background-color: v-bind("Color.border");
-  max-width: 100% - 700px;
-  border-radius: 2px;
-  margin-bottom: 12px;
-  margin-top: 12px;
-  text-align: left;
-  padding: 4px 0px 4px 12px;
-}
-
-.record-level {
-  display: flex;
-  width: 100%;
-}
-
-.record-level-left {
-  flex: 1;
-  width: 150px;
-  text-align: left;
-}
-
-.record-level-right {
-  flex: 1;
-  width: 150px;
-  text-align: right;
-}
-
-.category-level {
-  display: flex;
-  width: 100%;
-}
-
-.category-level-left {
-  flex: 1;
-  width: 150px;
-  text-align: left;
-}
-
-.category-level-right {
-  flex: 1;
-  width: 182px;
-  text-align: right;
-}
-
-.sub-category-level {
-  display: flex;
-  width: 100%;
-}
-
-.sub-category-level-left {
-  flex: 1;
-  width: 150px;
-  text-align: left;
-}
-
-.sub-category-level-right {
-  flex: 1;
-  width: 166px;
-  text-align: right;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background-color: rgba(255, 255, 255, 0.6);
 }
 
 .empty-page {
-  max-height: calc(100vh - 450px);
+  max-height: 240px;
+  opacity: 0.9;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.chart {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  margin-top: 8px;
+  margin-left: 8px;
+}
+
+/* 点击图表项后在卡片右侧滑出详情，点击遮罩（旁边空白处）收回 */
+.detail-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background-color: rgba(27, 31, 39, 0.1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
+}
+
+.detail-mask.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.detail-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  width: min(380px, 42%);
+  padding: 14px 16px 16px;
+  background-color: #ffffff;
+  border-left: 1px solid #ebecf0;
+  border-radius: 0 12px 12px 0;
+  box-shadow: -12px 0 32px rgba(27, 31, 39, 0.08);
+  transform: translateX(calc(100% + 12px));
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detail-drawer.is-open {
+  transform: translateX(0);
+}
+
+.detail-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.detail-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: #5a6274;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.detail-close:hover {
+  color: #6c5dd3;
+  background-color: #efecfb;
+}
+
+.detail-container {
+  flex: 1;
+  min-height: 0;
+}
+
+.detail-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: #6e7686;
+  text-align: left;
+}
+
+.record-level,
+.category-level,
+.sub-category-level {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  font-size: 13px;
+}
+
+.tree-row {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.record-level-left,
+.category-level-left,
+.sub-category-level-left {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.record-level-right,
+.category-level-right,
+.sub-category-level-right {
+  flex: 0 0 88px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #1b1f27;
+}
+
+.category-level-left {
+  font-weight: 600;
+  color: #1b1f27;
+}
+
+.sub-category-level-left,
+.record-level-left {
+  color: #4b5261;
 }
 </style>

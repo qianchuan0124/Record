@@ -25,19 +25,38 @@
       </div>
       <div ref="myEchart" class="chart"></div>
     </div>
-    <div class="detail-data" v-if="data.length !== 0">
-      <div class="detail-container">
-        <div class="detail-title">
-          <span>{{ L10n.detail }}</span>
+    <div
+      class="detail-mask"
+      :class="{ 'is-open': detailVisible }"
+      @click="closeDetail"></div>
+    <aside class="detail-drawer" :class="{ 'is-open': detailVisible }">
+      <div class="detail-header">
+        <span class="detail-title">{{ L10n.detail }}</span>
+        <span class="detail-header-actions">
           <span class="all-span" @click="onTapTotal">{{ L10n.all }}</span>
-        </div>
+          <button
+            class="detail-close"
+            type="button"
+            aria-label="关闭详情"
+            @click="closeDetail">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path
+                d="M3.2 3.2l9.6 9.6M12.8 3.2l-9.6 9.6"
+                stroke="currentColor"
+                stroke-width="1.6"
+                stroke-linecap="round" />
+            </svg>
+          </button>
+        </span>
+      </div>
+      <div class="detail-container" ref="detailPanel">
         <el-tree-v2
-          style="max-width: calc(100vh)"
+          style="width: 100%"
           :data="data"
           :props="props"
-          :height="550">
+          :height="treeHeight">
           <template #default="{ data }">
-            <div v-if="data.level === 0">
+            <div v-if="data.level === 0" class="tree-row">
               <div class="category-level">
                 <span class="category-level-left">
                   {{ data.label }}
@@ -47,7 +66,7 @@
                 </span>
               </div>
             </div>
-            <div v-else-if="data.level === 1">
+            <div v-else-if="data.level === 1" class="tree-row">
               <div class="sub-category-level">
                 <span class="sub-category-level-left">
                   {{ data.label }}
@@ -57,7 +76,7 @@
                 </span>
               </div>
             </div>
-            <div v-else-if="data.level === 2">
+            <div v-else-if="data.level === 2" class="tree-row">
               <div class="sub-category-level">
                 <span class="sub-category-level-left">
                   {{ data.label }}
@@ -67,7 +86,7 @@
                 </span>
               </div>
             </div>
-            <div v-else-if="data.level === 3">
+            <div v-else-if="data.level === 3" class="tree-row">
               <el-tooltip
                 class="box-item"
                 effect="dark"
@@ -91,13 +110,12 @@
           </template>
         </el-tree-v2>
       </div>
-      <div class="detail-space"></div>
-    </div>
+    </aside>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, onDeactivated, onUnmounted } from "vue";
+import { onMounted, ref, onDeactivated, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
 import {
   fetchYearlyAnalysis,
@@ -105,7 +123,6 @@ import {
   generateYearlyTotalInfo,
   CategoryNode,
 } from "./Manager";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { ElMessage } from "element-plus";
@@ -119,6 +136,24 @@ const beforeEndYear = ref<string>(new Date().getFullYear().toString());
 const myEchart = ref<HTMLDivElement | null>(null);
 
 const currentYear = ref<number>(0);
+
+// 详情树高度按容器实时高度计算，避免固定 550px 超出卡片被裁
+const detailPanel = ref<HTMLElement | null>(null);
+const treeHeight = ref(420);
+// 详情改为侧边滑出，不常驻占位
+const detailVisible = ref(false);
+
+function closeDetail() {
+  detailVisible.value = false;
+}
+
+function updateTreeHeight() {
+  const el = detailPanel.value;
+  if (!el) {
+    return;
+  }
+  treeHeight.value = Math.max(180, el.clientHeight);
+}
 
 function disabledStartYear(time: Date) {
   return time.getFullYear() > Number(endYear.value);
@@ -162,6 +197,19 @@ async function reloadData() {
     const analysisData = await fetchYearlyAnalysis(currentYearsList());
     const descriptions = analysisData[0].description;
     const option = {
+      color: [
+        "#6c5dd3",
+        "#8b7fdf",
+        "#18a472",
+        "#f0a93b",
+        "#4c9be8",
+        "#e2434f",
+        "#59c3c3",
+        "#8a90a2",
+        "#b7aef0",
+        "#d8a7b1",
+        "#7fbf7f",
+      ],
       tooltip: {
         trigger: "item",
         axisPointer: {
@@ -192,7 +240,17 @@ async function reloadData() {
       ],
       series: analysisData,
     };
-    yearlyChart.value?.setOption(option, true);
+    // 用 replaceMerge 整组替换 series：既清理已删除的分类，又保留已就绪的坐标系统，
+    // 避免 notMerge 重建模型后 resize 时柱状图坐标系缺失导致 barPolar 报错
+    if (!baseReady && yearlyChart.value) {
+      baseReady = true;
+      yearlyChart.value.setOption({
+        xAxis: { type: "category", data: [] },
+        yAxis: { type: "value" },
+        series: [],
+      });
+    }
+    yearlyChart.value?.setOption(option, { replaceMerge: ["series"] });
   } catch (error) {
     logError("reload yearly data failed " + error);
     if (error instanceof Error) {
@@ -204,6 +262,27 @@ async function reloadData() {
 }
 
 const yearlyChart = ref<echarts.ECharts | null>(null);
+let chartObserver: IntersectionObserver | null = null;
+// 首次 setOption 会走 ECharts 的初始化分支（initBase），此后 resize 无法重建坐标系；
+// 先落一次空坐标系配置，让数据渲染走 merge 分支，保证 resize / 切回页签稳定
+let baseReady = false;
+let chartWidth = 0;
+let chartHeight = 0;
+
+// 容器被隐藏时尺寸为 0，直接 resize 会让柱状图坐标系丢失，因此只在可见且尺寸变化时重绘
+function resizeChart() {
+  const el = myEchart.value;
+  if (!el || el.clientWidth === 0 || el.clientHeight === 0) {
+    return;
+  }
+  updateTreeHeight();
+  if (el.clientWidth === chartWidth && el.clientHeight === chartHeight) {
+    return;
+  }
+  chartWidth = el.clientWidth;
+  chartHeight = el.clientHeight;
+  yearlyChart.value?.resize();
+}
 
 function registerNotify() {
   notifyCenter.on(NotifyType.IMPORT_DATA_SUCCESS, reloadData);
@@ -221,15 +300,29 @@ function disableNotify() {
 
 onDeactivated(() => {
   disableNotify();
+  closeDetail();
 });
 
 onUnmounted(() => {
   disableNotify();
+  chartObserver?.disconnect();
+  window.removeEventListener("resize", resizeChart);
+  yearlyChart.value?.dispose();
+  yearlyChart.value = null;
+  baseReady = false;
 });
 
-onMounted(async () => {
-  yearlyChart.value = echarts.init(myEchart.value as HTMLDivElement);
-
+// 容器隐藏时宽高为 0，此时初始化 echarts 会导致柱状图坐标系缺失，需等待可见后再初始化
+function setupChart(): boolean {
+  const el = myEchart.value;
+  if (!el || el.clientWidth === 0 || el.clientHeight === 0) {
+    return false;
+  }
+  yearlyChart.value = echarts.init(el);
+  baseReady = false;
+  chartWidth = el.clientWidth;
+  chartHeight = el.clientHeight;
+  window.addEventListener("resize", resizeChart);
   reloadData();
   yearlyChart.value.on("click", function (params) {
     const category = params.seriesName;
@@ -240,11 +333,35 @@ onMounted(async () => {
     }
   });
   registerNotify();
+  return true;
+}
+
+onMounted(() => {
+  const el = myEchart.value;
+  if (!el) {
+    return;
+  }
+  setupChart();
+  // 首次显示时初始化，之后每次显示时按新尺寸重绘
+  chartObserver = new IntersectionObserver((entries) => {
+    if (!entries.some((entry) => entry.isIntersecting)) {
+      return;
+    }
+    if (!yearlyChart.value) {
+      setupChart();
+    } else {
+      resizeChart();
+    }
+  });
+  chartObserver.observe(el);
 });
 
 async function reloadDetailValues(year: number, category: string) {
   try {
     data.value = [await generateYearlyCategoryNode(year, category)];
+    detailVisible.value = true;
+    await nextTick();
+    updateTreeHeight();
   } catch (error) {
     if (error instanceof Error) {
       ElMessage.error(error.message);
@@ -261,6 +378,9 @@ async function onTapTotal() {
 async function reloadYearlyTotalInfo(year: number) {
   try {
     data.value = [await generateYearlyTotalInfo(year)];
+    detailVisible.value = true;
+    await nextTick();
+    updateTreeHeight();
   } catch (error) {
     if (error instanceof Error) {
       ElMessage.error(error.message);
@@ -283,147 +403,187 @@ const data = ref<CategoryNode[]>([]);
 
 <style scoped>
 .yearly-data {
+  position: relative;
   display: flex;
-  align-items: top;
-  width: 100% - 24px;
-  width: calc(100vh - 40);
-  height: 100%;
+  align-items: stretch;
+  width: 100%;
+  height: calc(100vh - 200px);
+  min-height: 520px;
+  padding: 8px 20px 12px 8px;
+  overflow: hidden;
   background-color: white;
-  margin: 20px;
-  border-radius: 10px;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
   caret-color: transparent;
 }
 
 .yearly-container {
-  flex: 0.618;
-  margin-top: 12px;
-  margin-left: 38px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0 0 8px;
 }
 
 .select-year {
-  font-size: 13px;
-  color: v-bind("Color.info");
-  text-align: left;
-  padding: 12px 0px 0px 16px;
   display: flex;
   align-items: center;
+  gap: 8px;
+  padding: 0;
+  font-size: 12px;
+  color: #6e7686;
   user-select: none;
 }
 
-.select-year-tip-start {
-  margin-right: 12px;
+.select-year-tip-start,
+.select-year-tip-end {
+  margin: 0;
   user-select: none !important;
 }
 
-.select-year-tip-end {
-  margin-left: 12px;
-  margin-right: 12px;
-  user-select: none;
-}
-
 .chart {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+/* 点击图表项后在卡片右侧滑出详情，点击遮罩（旁边空白处）收回 */
+.detail-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background-color: rgba(27, 31, 39, 0.1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.24s ease;
+}
+
+.detail-mask.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.detail-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
   display: flex;
+  flex-direction: column;
+  width: min(400px, 44%);
+  padding: 14px 16px 16px;
+  background-color: #ffffff;
+  border-left: 1px solid #ebecf0;
+  border-radius: 0 12px 12px 0;
+  box-shadow: -12px 0 32px rgba(27, 31, 39, 0.08);
+  transform: translateX(calc(100% + 12px));
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.detail-drawer.is-open {
+  transform: translateX(0);
+}
+
+.detail-header {
+  display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  width: 600px;
-  height: 600px;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
-.detail-data {
-  height: 100%;
-  margin-right: 12px;
-  margin-top: 12px;
-  flex: 0.382;
-  display: flex;
-  animation: fadeIn 1s ease-out;
+.detail-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.detail-space {
-  flex: 0.2;
+.detail-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: #5a6274;
+  cursor: pointer;
+  background-color: transparent;
+  border: none;
+  border-radius: 6px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.detail-close:hover {
+  color: #6c5dd3;
+  background-color: #efecfb;
 }
 
 .detail-container {
-  flex: 0.8;
+  flex: 1;
+  min-height: 0;
 }
 
 .detail-title {
-  display: flex;
-  justify-content: space-between; /* 左右两边对齐 */
-  align-items: center; /* 垂直居中 */
-  font-size: 16px;
-  font-weight: 700;
-  color: v-bind("Color.primary");
-  background-color: v-bind("Color.border");
-  width: calc(100vh - 12);
-  border-radius: 2px;
-  margin-bottom: 12px;
-  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: #6e7686;
   text-align: left;
-  padding: 4px 16px 4px 12px;
 }
 
 .all-span {
-  color: v-bind("Color.info");
+  color: #6c5dd3;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.record-level {
+.all-span:hover {
+  text-decoration: underline;
+}
+
+.record-level,
+.category-level,
+.sub-category-level {
   display: flex;
+  align-items: center;
+  width: 100%;
+  font-size: 13px;
+}
+
+.tree-row {
+  flex: 1;
+  min-width: 0;
   width: 100%;
 }
 
-.record-level-left {
+.record-level-left,
+.category-level-left,
+.sub-category-level-left {
   flex: 1;
-  width: 150px;
+  min-width: 0;
+  overflow: hidden;
   text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.record-level-right {
-  flex: 1;
-  width: 150px;
+.record-level-right,
+.category-level-right,
+.sub-category-level-right {
+  flex: 0 0 88px;
   text-align: right;
-}
-
-.category-level {
-  display: flex;
-  width: 100%;
+  font-variant-numeric: tabular-nums;
+  color: #1b1f27;
 }
 
 .category-level-left {
-  flex: 1;
-  width: 150px;
-  text-align: left;
+  font-weight: 600;
+  color: #1b1f27;
 }
 
-.category-level-right {
-  flex: 1;
-  width: 182px;
-  text-align: right;
-}
-
-.sub-category-level {
-  display: flex;
-  width: 100%;
-}
-
-.sub-category-level-left {
-  flex: 1;
-  width: 150px;
-  text-align: left;
-}
-
-.sub-category-level-right {
-  flex: 1;
-  width: 166px;
-  text-align: right;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+.sub-category-level-left,
+.record-level-left {
+  color: #4b5261;
 }
 </style>
-./AnalysisManager @/configs/Color.json@/configs/L10n.json ./Manager

@@ -1,13 +1,7 @@
 <template>
   <div class="container">
-    <div>
-      <CreateView></CreateView>
-    </div>
-    <div>
-      <FilterView
-        @filterChanged="handleFilterChanged"
-        ref="filterView"></FilterView>
-    </div>
+    <CreateView></CreateView>
+    <FilterView @filterChanged="handleFilterChanged" ref="filterView"></FilterView>
     <div class="content-container">
       <div class="month-select-container">
         <MonthSelect
@@ -22,14 +16,7 @@
 </template>
 
 <script lang="ts" setup>
-import {
-  ref,
-  ComponentPublicInstance,
-  onMounted,
-  onUnmounted,
-  onDeactivated,
-} from "vue";
-import Color from "@/configs/Color.json";
+import { ref, ComponentPublicInstance } from "vue";
 import CreateView from "./CreateView.vue";
 import FilterView from "./FilterView.vue";
 import MonthSelect from "./MonthSelect.vue";
@@ -47,8 +34,6 @@ const monthSelect = ref<ComponentPublicInstance<typeof MonthSelect> | null>(
 
 const filterView = ref<ComponentPublicInstance<typeof FilterView> | null>(null);
 
-const dashboardHeight = ref<string>("700px");
-
 function handleMonthChanged(month: Month) {
   filterView.value?.onMonthChanged(month);
 }
@@ -56,60 +41,32 @@ function handleMonthChanged(month: Month) {
 function handleFilterChanged(filter: Filter) {
   contentView.value?.onFilterChanged(filter);
 }
-
-function handleContainerWidth() {
-  dashboardHeight.value = window.innerHeight - 120 + "px";
-}
-
-onMounted(() => {
-  window.addEventListener("resize", handleContainerWidth);
-  handleContainerWidth();
-});
-
-onUnmounted(() => {
-  window.removeEventListener("resize", handleContainerWidth);
-});
-
-onDeactivated(() => {
-  window.removeEventListener("resize", handleContainerWidth);
-});
 </script>
 
 <style scoped>
 .container {
-  background-color: v-bind("Color.background");
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  min-width: 800px;
-  height: v-bind("dashboardHeight");
-  overflow: auto !important;
-  user-select: none !important;
-}
-
-/* 针对Webkit浏览器隐藏滚动条 */
-.container::-webkit-scrollbar {
-  display: none;
-}
-
-/* 对于支持scrollbar-width属性的浏览器（如Firefox），也隐藏滚动条 */
-.container {
-  scrollbar-width: none;
-}
-
-.el-tabs--right {
-  overflow-y: hidden; /* 只在垂直方向上显示滚动条 */
-  overflow-x: hidden; /* 隐藏水平方向的滚动条 */
+  height: 100%;
+  padding: 16px 24px 24px 16px;
+  overflow-y: auto;
 }
 
 .content-container {
   display: flex;
+  align-items: flex-start;
+  gap: 16px;
   width: 100%;
 }
 
 .month-select-container {
-  width: 240px;
+  flex: 0 0 220px;
+  width: 220px;
 }
 
 .content-table-container {
-  flex-grow: 1;
+  flex: 1;
+  min-width: 0;
 }
 </style>

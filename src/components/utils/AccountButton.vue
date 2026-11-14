@@ -1,5 +1,7 @@
 <template>
-  <button class="button" @click="clickHandler">{{ buttonText }}</button>
+  <button class="button" :disabled="disabled" @click="clickHandler">
+    {{ buttonText }}
+  </button>
 </template>
 
 <script lang="ts" setup>
@@ -20,7 +22,7 @@ const props = defineProps({
   },
   textFontSize: {
     type: String,
-    default: "16px",
+    default: "13px",
   },
   buttonType: {
     type: String as PropType<"primary" | "success" | "delete">,
@@ -29,6 +31,10 @@ const props = defineProps({
   clickHandler: {
     type: Function as PropType<() => void>,
     default: () => {},
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
   },
 });
 
@@ -54,15 +60,30 @@ function backgroundColor() {
   height: v-bind("buttonHeight");
   background-color: v-bind("backgroundColor()");
   border: 0px;
-  border-radius: 10px;
-  box-shadow: 0px 3px 12px rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  box-shadow: 0px 1px 2px rgba(27, 31, 39, 0.12);
   color: white;
+  font-family: inherit;
   font-size: v-bind("textFontSize");
-  transition: transform 0.1s ease;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.button:not(:disabled):hover {
+  filter: brightness(1.06);
+  box-shadow: 0px 2px 6px rgba(27, 31, 39, 0.16);
 }
 
 .button:active {
-  transform: scale(0.95); /* 定义点击时的缩放效果 */
+  transform: scale(0.97); /* 定义点击时的缩放效果 */
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 </style>
 @/configs/Color.json

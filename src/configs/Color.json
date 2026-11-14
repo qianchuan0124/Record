@@ -1,10 +1,14 @@
 {
-    "info": "#b6b6b6",
-    "background": "#F9F8F8",
-    "searchBackground": "#f7f8f9",
+    "info": "#6E7686",
+    "background": "#F4F5F7",
+    "searchBackground": "#F7F8FA",
     "primary": "#6C5DD3",
-    "success": "#52CD9F",
-    "delete": "#F14A5B",
-    "text": "#121213",
-    "border": "#EFEFEF"
+    "primaryLight": "#EFECFB",
+    "success": "#18A472",
+    "delete": "#E2434F",
+    "text": "#1B1F27",
+    "textSecondary": "#5A6274",
+    "border": "#EBECF0",
+    "hover": "#F6F6F9",
+    "surface": "#FFFFFF"
 }

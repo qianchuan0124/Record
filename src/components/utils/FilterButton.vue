@@ -8,6 +8,7 @@
   <div
     v-else-if="buttonType === 'category'"
     class="button-style"
+    :class="{ 'is-active': categoryTouched && categoryValue.length > 0 }"
     @click="clickCategory()">
     <span class="button-title-select">{{ L10n.category }}</span>
     <el-cascader
@@ -26,6 +27,7 @@
   <div
     v-else-if="buttonType === 'type'"
     class="button-style"
+    :class="{ 'is-active': typeTouched && typeValue.length > 0 }"
     @click="clickType()">
     <span class="button-title-select">{{ L10n.type }}</span>
     <el-cascader
@@ -36,13 +38,16 @@
       :options="typeOptions"
       :props="categoryProps" />
   </div>
-  <div v-else-if="buttonType === 'remark'" class="button-style-search">
+  <div
+    v-else-if="buttonType === 'remark'"
+    class="button-style-search"
+    :class="{ 'is-active': remarkValue.length > 0 }">
     <img class="search-reamrk" src="@/assets/remark_search_icon.svg" />
     <el-input
       v-model="remarkValue"
       @change="onRemarkChanged"
       class="button-search"
-      :style="{ width: width, height: height }"
+      :style="{ width: width, height: controlHeight }"
       :placeholder="`${L10n.search_placeholder}`"
       clearable />
   </div>
@@ -75,7 +80,6 @@ import {
   onUnmounted,
   onDeactivated,
 } from "vue";
-import Color from "@/configs/Color.json";
 import L10n from "@/configs/L10n.json";
 import { getCategories, accountTypes } from "@/configs/CategoryParser";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
@@ -102,9 +106,14 @@ const selectedTime = ref<[Date, Date]>([
   new Date(2000, 10, 11, 10, 10),
 ]);
 const remarkValue = ref("");
+// 分类/类别带有占位默认值，这里单独记录用户是否真正选择过，避免按钮误显示为已筛选
+const categoryTouched = ref(false);
+const typeTouched = ref(false);
 
 const width = ref("");
 const height = ref("");
+// 搜索框内部输入控件跟随外框内容区高度，避免溢出盖住外框边框
+const controlHeight = ref("100%");
 const buttonWidth = ref("");
 
 defineExpose({
@@ -120,9 +129,11 @@ function cleanValues() {
   switch (props.buttonType) {
     case "category":
       categoryValue.value = [];
+      categoryTouched.value = false;
       break;
     case "type":
       typeValue.value = [];
+      typeTouched.value = false;
       break;
     case "remark":
       remarkValue.value = "";
@@ -150,15 +161,19 @@ const calculateDimensions = () => {
     case "category":
     case "type":
     case "time":
+      width.value = "30px";
+      height.value = "30px";
+      buttonWidth.value = "88px";
+      break;
     case "all":
       width.value = "30px";
-      height.value = "28px";
-      buttonWidth.value = "80px";
+      height.value = "30px";
+      buttonWidth.value = "56px";
       break;
     case "remark":
-      width.value = "216px";
-      height.value = "28px";
-      buttonWidth.value = "280px";
+      width.value = "196px";
+      height.value = "30px";
+      buttonWidth.value = "260px";
       break;
   }
 };
@@ -199,12 +214,14 @@ function clickAll() {
 
 function onCategoryChanged(isOpen: boolean) {
   if (!isOpen) {
+    categoryTouched.value = categoryValue.value.length > 0;
     emit("update:category", categoryValue.value);
   }
 }
 
 function onTypeChanged(isOpen: boolean) {
   if (!isOpen) {
+    typeTouched.value = typeValue.value.length > 0;
     emit("update:type", typeValue.value);
   }
 }
@@ -244,18 +261,21 @@ onDeactivated(() => {
 
 <style scoped>
 .button-title {
-  font-size: 14px;
-  color: v-bind("Color.info");
+  font-size: 13px;
+  font-weight: 600;
+  color: #5a6274;
 }
 
 .button-title-select {
-  font-size: 14px;
-  color: v-bind("Color.info");
-  margin-left: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  margin-left: 2px;
+  white-space: nowrap;
 }
 
 .filter-all {
-  width: v-bind("width");
+  width: v-bind("buttonWidth");
   height: v-bind("height");
 }
 
@@ -263,24 +283,51 @@ onDeactivated(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 2px;
   width: v-bind("buttonWidth");
-  background-color: white; /* 设置背景色为白色 */
-  border-radius: 6px; /* 设置圆角 */
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); /* 添加阴影 */
+  height: v-bind("height");
+  padding: 0 6px;
+  background-color: white;
+  border: 1px solid #e3e5ea;
+  border-radius: 8px;
+  color: #5a6274;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .button-style-search {
   display: flex;
   align-items: center;
   width: v-bind("buttonWidth");
-  background-color: white; /* 设置背景色为白色 */
-  border-radius: 6px; /* 设置圆角 */
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); /* 添加阴影 */
+  height: v-bind("height");
+  padding: 0 8px;
+  background-color: white;
+  border: 1px solid #e3e5ea;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .button-style:hover,
-.button-style:focus {
-  border-color: v-bind("Color.primary"); /* 设置鼠标悬停时的边框颜色 */
+.button-style-search:hover {
+  border-color: #c9c3ee;
+  background-color: #fafafe;
+}
+
+/* 搜索框聚焦：与外框一体的柔和反馈，不额外画硬描边 */
+.button-style-search:focus-within {
+  border-color: #6c5dd3;
+  background-color: white;
+  box-shadow: var(--record-focus-halo, 0 0 0 3px rgba(108, 93, 211, 0.12));
+}
+
+.button-style.is-active,
+.button-style-search.is-active {
+  border-color: #b7aef0;
+  background-color: #f3f0fd;
+  color: #6c5dd3;
 }
 
 .button-time {
@@ -288,14 +335,15 @@ onDeactivated(() => {
 }
 
 .search-reamrk {
-  width: 22px;
-  height: 20px;
-  margin-left: 8px;
-  margin-right: 4px;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  opacity: 0.7;
 }
 
 :deep(.button-search .el-input__inner) {
   width: v-bind("width") !important;
+  font-weight: 600;
 }
 
 :deep(.el-input__prefix) {
@@ -328,7 +376,7 @@ input[type="number"] {
   border: none !important; /* 移除边框 */
   box-shadow: none !important; /* 如果有阴影也一并移除 */
   width: 1px !important;
-  height: 28px !important;
+  height: 30px !important;
 }
 
 :deep(.el-input__suffix) {
@@ -340,6 +388,12 @@ input[type="number"] {
   box-shadow: none !important;
   flex-grow: 0 !important;
   padding: 0px;
+  background: transparent;
+}
+
+:deep(.button-search .el-input__wrapper) {
+  min-height: 0;
+  height: 100%;
 }
 
 /* 隐藏选中值的样式 */
