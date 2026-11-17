@@ -614,6 +614,22 @@ onActivated(() => {
   font-size: 12px;
 }
 
+/*
+ * el-table 在隐藏的页签里挂载时量不到高度，而 main.ts 给 ResizeObserver 加了 200ms 防抖，
+ * 切换页签后空文案会先贴在顶部、等表格重新测量后再跳到中间。这里让空状态直接铺满表格主体，
+ * 位置只由 CSS 决定，不再依赖后续测量。
+ */
+.table-card :deep(.el-table__empty-block) {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0;
+}
+
 .placeholder {
   color: #c9ccd4;
 }
