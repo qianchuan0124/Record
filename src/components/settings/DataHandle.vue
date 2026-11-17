@@ -1,11 +1,11 @@
 <template>
-  <div>
-    <div class="export-data">
-      <div class="data-title">
-        <span>{{ L10n.export_data }}</span>
-      </div>
-
-      <el-button type="primary" :loading="exportLoading" @click="confirmExport">
+  <div class="data-handle">
+    <div class="action-row">
+      <el-button
+        type="primary"
+        class="action-btn"
+        :loading="exportLoading"
+        @click="confirmExport">
         <template #loading>
           <div class="custom-loading">
             <svg class="circular" viewBox="-10, -10, 50, 50">
@@ -26,30 +26,24 @@
         {{ L10n.export_data }}
       </el-button>
 
-      <div class="data-title sync-data">
-        <span>{{ L10n.sync_data }}</span>
-      </div>
-
-      <el-button type="primary" @click="syncData" class="sync-data-enter">
-        {{ L10n.sync_data }}
+      <el-button class="action-btn" @click="syncData">
+        {{ L10n.mobile_sync }}
       </el-button>
     </div>
 
-    <div class="upload-container">
-      <div class="data-title">
-        <span>{{ L10n.import_data }}</span>
+    <div class="import-section">
+      <div class="section-head">
+        <span class="section-title">{{ L10n.import_data }}</span>
+        <span class="upload-tip">{{ L10n.only_support_excel }}</span>
       </div>
 
-      <span class="import-tip">
-        {{ L10n.import_data_tips }}
-      </span>
-      <div class="table-title">
-        <span>{{ L10n.time }}</span>
-        <span>{{ L10n.type }}</span>
-        <span>{{ L10n.category }}</span>
-        <span>{{ L10n.sub_category }}</span>
-        <span>{{ L10n.amount }}</span>
-        <span>{{ L10n.remark }}</span>
+      <div class="column-chips">
+        <span
+          v-for="column in importColumns"
+          :key="column"
+          class="column-chip">
+          {{ column }}
+        </span>
       </div>
 
       <div class="upload-file">
@@ -70,9 +64,6 @@
             {{ L10n.drag_file_here }}
             <em>{{ L10n.click_to_upload }}</em>
           </div>
-          <template #tip>
-            <div class="el-upload__tip">{{ L10n.only_support_excel }}</div>
-          </template>
         </el-upload>
 
         <div v-if="importResult !== null" class="upload-info">
@@ -98,6 +89,8 @@
           </el-tooltip>
         </div>
       </div>
+
+      <span class="import-tip">{{ L10n.import_data_tips }}</span>
     </div>
 
     <el-dialog v-model="tipVisible" :title="L10n.data_handle" width="500">
@@ -214,12 +207,13 @@ import {
   parseImportData,
   ImportFailedResult,
   importData,
-  downloadXlsx,
-  exportAllData,
+  downloadWorkbook,
+  exportWorkbookData,
+  parsePayrollRows,
 } from "./Manager";
 import * as XLSX from "xlsx";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
-import { logError } from "@/utils/DataCenter";
+import { importPayroll, logError } from "@/utils/DataCenter";
 import { IpcType } from "@/models/IpcResponse";
 import QrcodeVue from "qrcode.vue";
 import { info } from "@/configs/Info";
@@ -228,6 +222,15 @@ const tipVisible = ref(false);
 const tipInfo = ref("");
 const tipType = ref<"export" | "import">("export");
 const exportLoading = ref(false);
+const importColumns = [
+  L10n.time,
+  L10n.type,
+  L10n.category,
+  L10n.sub_category,
+  L10n.amount,
+  L10n.remark,
+  L10n.count_in_budget,
+];
 
 const importFailedVisible = ref(false);
 const failedData = ref<ImportFailedResult[]>([]);
@@ -276,10 +279,24 @@ function handleChange(file: UploadFile) {
     fileReader.onload = async (e) => {
       const arrayBuffer = e.target?.result;
       const workbook = XLSX.read(arrayBuffer, { type: "buffer" });
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const sheetJson = (name?: string) => {
+        if (!name || !workbook.Sheets[name]) {
+          return [];
+        }
+        return XLSX.utils.sheet_to_json(workbook.Sheets[name]);
+      };
+      const payrollSheetNames = [L10n.salary, L10n.annual_bonus, "预算"];
+      const hasPayrollSheets = workbook.SheetNames.some((name) => payrollSheetNames.includes(name));
+      const recordSheetName = workbook.SheetNames.includes(L10n.record_list)
+        ? L10n.record_list
+        : (hasPayrollSheets ? "" : workbook.SheetNames[0]);
+      const jsonData = sheetJson(recordSheetName);
       const [failedRes, records] = parseImportData(jsonData);
+      const payroll = parsePayrollRows(
+        sheetJson(L10n.salary),
+        sheetJson(L10n.annual_bonus),
+        sheetJson("预算")
+      );
       if (
         (records.length === 0 && failedRes.length !== 0) ||
         failedRes.length > 10
@@ -291,8 +308,15 @@ function handleChange(file: UploadFile) {
       } else {
         try {
           await importData(records);
+          if (payroll.salaries.length > 0 || payroll.bonuses.length > 0 || payroll.budgets.length > 0) {
+            await importPayroll({
+              salaries: payroll.salaries,
+              bonuses: payroll.bonuses,
+              budgets: payroll.budgets,
+            });
+          }
           importResult.value = true;
-          failedData.value = failedRes;
+          failedData.value = [...failedRes, ...payroll.failed];
           ElMessage.success(L10n.import_success);
           notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
         } catch (error) {
@@ -343,9 +367,9 @@ async function exportExcel() {
   try {
     tipVisible.value = false;
     exportLoading.value = true;
-    let datalist: string[][] = await exportAllData(); // 需要导出的表格数据
+    const sheets = await exportWorkbookData();
     const title = L10n.record_list + "-" + formatDate(new Date());
-    downloadXlsx(datalist, title);
+    downloadWorkbook(sheets, title);
     ElMessage.success(L10n.export_success);
     exportLoading.value = false;
   } catch (error) {
@@ -386,39 +410,83 @@ const svg = `
   stroke-linecap: round;
 }
 
-.export-data {
+.data-handle {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  max-width: 300px;
+  gap: 14px;
 }
 
-.export-data .el-button {
-  width: 100%;
-  height: 34px;
+.action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
-.upload-container {
+.action-btn {
   width: 100%;
-  margin-top: 24px;
-  padding-top: 20px;
+  height: 36px;
+  margin-left: 0 !important;
+}
+
+.import-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 12px;
   border-top: 1px solid #f2f3f6;
+}
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1b1f27;
+}
+
+.upload-tip {
+  font-size: 11px;
+  color: #9aa0ad;
+}
+
+.column-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.column-chip {
+  padding: 2px 8px;
+  background-color: #f6f5fb;
+  border-radius: 10px;
+  font-size: 11px;
+  color: #6c5dd3;
 }
 
 .upload-file {
   display: flex;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 12px;
   width: 100%;
   text-align: left;
 }
 
 .upload-select {
-  width: 300px;
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-select :deep(.el-upload) {
+  width: 100%;
 }
 
 .upload-select :deep(.el-upload-dragger) {
-  padding: 20px 12px;
+  padding: 12px 12px;
   background-color: #fafafb;
   border: 1px dashed #e3e5ea;
   border-radius: 8px;
@@ -431,61 +499,25 @@ const svg = `
 }
 
 .upload-select :deep(.el-icon--upload) {
-  margin-bottom: 8px;
-  font-size: 36px;
+  margin-bottom: 2px;
+  font-size: 24px;
   color: #b9bdc7;
 }
 
 .upload-select :deep(.el-upload__text) {
   font-size: 12px;
-  line-height: 1.7;
+  line-height: 1.6;
   color: #5a6274;
-}
-
-.upload-select :deep(.el-upload__tip) {
-  margin-top: 6px;
-  font-size: 11px;
-  color: #9aa0ad;
 }
 
 .upload-info {
   display: flex;
   align-items: center;
-  margin-top: 8px;
-}
-
-.data-title {
-  margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #6e7686;
-}
-
-.table-title {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr 1fr 1.2fr 1fr 1.6fr;
-  margin-bottom: 12px;
-  padding: 8px 10px;
-  background-color: #fafafc;
-  border: 1px solid #f2f3f6;
-  border-radius: 6px;
-}
-
-.table-title span {
-  padding: 0;
-  background: none;
-  border: none;
-  font-size: 11px;
-  color: #6e7686;
-  text-align: left;
-  white-space: nowrap;
 }
 
 .import-tip {
-  display: block;
-  margin-bottom: 12px;
-  font-size: 12px;
-  font-weight: 400;
+  font-size: 11px;
+  line-height: 1.5;
   color: #b26a00;
 }
 

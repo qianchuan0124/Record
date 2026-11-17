@@ -3,13 +3,16 @@ import path from "path";
 import { ipcMain } from "electron";
 import { app } from 'electron';
 import { Record } from "@/models/Record";
+import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from "@/models/Payroll";
+import { calcSalaryTax } from "@/utils/PayrollTax";
 import { IpcResponse, IpcType } from "@/models/IpcResponse";
 import fs from "fs/promises";
 import { ErrorType } from "./ErrorInfo";
 import { logError, logInfo } from "@/utils/Log";
 
-const userDataPath = app.getPath('userData');
-const dbPath = path.join(userDataPath, "records.db");
+export const userDataPath = app.getPath('userData');
+export const dbPath = path.join(userDataPath, "records.db");
+export const customCategoryPath = path.join(userDataPath, "category-custom.json");
 
 logInfo("dbPath: " + dbPath);
 
@@ -23,62 +26,185 @@ CREATE TABLE record (
     subCategory TEXT NOT NULL,
     remark TEXT NOT NULL,
     isDeleted BOOLEAN Default 0,
+    syncId INTEGER DEFAULT 0,
+    countInBudget BOOLEAN DEFAULT 1
+);
+`
+
+// 薪酬相关表。云端恢复旧快照时也会走这里的 IF NOT EXISTS，保证表结构始终可用。
+const createPayrollTableSql = `
+CREATE TABLE IF NOT EXISTS salary_record (
+    id INTEGER PRIMARY KEY,
+    date INTEGER NOT NULL,
+    baseSalary REAL NOT NULL DEFAULT 0,
+    overtimePay REAL NOT NULL DEFAULT 0,
+    oneTimeBonus REAL NOT NULL DEFAULT 0,
+    socialInsurance REAL NOT NULL DEFAULT 0,
+    tax REAL NOT NULL DEFAULT 0,
+    taxRate REAL NOT NULL DEFAULT 0,
+    netPay REAL NOT NULL DEFAULT 0,
+    taxManual BOOLEAN DEFAULT 0,
+    isDeleted BOOLEAN DEFAULT 0,
+    syncId INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS annual_bonus (
+    id INTEGER PRIMARY KEY,
+    date INTEGER NOT NULL,
+    bonus REAL NOT NULL DEFAULT 0,
+    tax REAL NOT NULL DEFAULT 0,
+    taxRate REAL NOT NULL DEFAULT 0,
+    netPay REAL NOT NULL DEFAULT 0,
+    isDeleted BOOLEAN DEFAULT 0,
+    syncId INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS budget_item (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    amount REAL NOT NULL DEFAULT 0,
+    isDeleted BOOLEAN DEFAULT 0,
     syncId INTEGER DEFAULT 0
 );
 `
 
-// 连接到数据库，如果数据库不存在则会被创建
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        logError("Connected database failed, error:" + err.message);
-        return
-    }
-    logInfo("Connected to the records database.");
+// 数据库连接实例，需要支持云端恢复后替换整个数据库文件，因此保持可变
+let db: sqlite3.Database;
+
+export function getDb(): sqlite3.Database {
+    return db;
+}
+
+// 连接到数据库，如果数据库不存在则会被创建，并确保表结构已是最新
+function openDatabase(): Promise<void> {
+    return new Promise((resolve, reject) => {
+        db = new sqlite3.Database(dbPath, (err) => {
+            if (err) {
+                logError("Connected database failed, error:" + err.message);
+                reject(err);
+                return;
+            }
+            logInfo("Connected to the records database.");
+            // 检查record表是否存在
+            db.get(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='record';",
+                (err, row) => {
+                    if (err) {
+                        logError("check table failed, error:" + err.message);
+                        reject(err);
+                        return;
+                    }
+                    if (row) {
+                        logInfo('Table "record" already exists.');
+                        upgrateDatabase().then(resolve).catch(reject);
+                    } else {
+                        logInfo('Table "record" does not exist. Creating table...');
+                        // 读取schema.sql文件并执行SQL语句创建表
+                        db.exec(createTableSql, (err) => {
+                            if (err) {
+                                logError("Create table failed, error:" + err.message);
+                                reject(err);
+                                return;
+                            }
+                            db.exec(createPayrollTableSql, (payrollErr) => {
+                                if (payrollErr) {
+                                    logError("Create payroll tables failed, error:" + payrollErr.message);
+                                    reject(payrollErr);
+                                    return;
+                                }
+                                logInfo('Table "record" has been created.');
+                                resolve();
+                            });
+                        });
+                    }
+                }
+            );
+        });
+    });
+}
+
+// 应用启动时立即建立连接，保留即用即查的行为
+const dbReady = openDatabase().catch((err) => {
+    logError("init database failed, error:" + err);
 });
 
-// 检查record表是否存在
-db.get(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name='record';",
-    (err, row) => {
-        if (err) {
-            logError("check table failed, error:" + err.message);
-            return
-        }
-        if (row) {
-            logInfo('Table "record" already exists.');
-            upgrateDatabase();
-        } else {
-            logInfo('Table "record" does not exist. Creating table...');
-            // 读取schema.sql文件并执行SQL语句创建表
-            db.exec(createTableSql, (err) => {
-                if (err) {
-                    logError("Create table failed, error:" + err.message);
-                    return
-                }
-                logInfo('Table "record" has been created.');
-            });
-        }
-    }
-);
+export function whenDatabaseReady(): Promise<void> {
+    return dbReady;
+}
 
-function upgrateDatabase() {
-    // 检查是否已经有syncId列
-    db.all("PRAGMA table_info(record);", (err, rows: any[]) => { // 使用 db.all 而不是 db.get
-        if (err) {
-            logError("Check columns failed, error:" + err.message);
+export function closeDatabase(): Promise<void> {
+    return new Promise((resolve) => {
+        if (!db) {
+            resolve();
             return;
         }
-        const hasSyncId = rows.some(row => row.name === "syncId");
-        if (!hasSyncId) {
-            // 如果没有syncId列，则添加
-            db.exec("ALTER TABLE record ADD COLUMN syncId INTEGER DEFAULT 0;", (err) => {
+        db.close(() => resolve());
+    });
+}
+
+// 云端恢复会用快照文件整体覆盖本地数据库，覆盖后需要重新打开连接
+export async function reopenDatabase(): Promise<void> {
+    await closeDatabase();
+    await openDatabase();
+}
+
+function upgrateDatabase(): Promise<void> {
+    return new Promise((resolve) => {
+        const upgradeRecordColumns = () => {
+            db.all("PRAGMA table_info(record);", (err, rows: any[]) => {
                 if (err) {
-                    logError("Add column 'syncId' failed, error:" + err.message);
+                    logError("Check columns failed, error:" + err.message);
+                    resolve();
                     return;
                 }
-                logInfo("Column 'syncId' has been added to 'record' table.");
+                const hasSyncId = rows.some(row => row.name === "syncId");
+                const hasCountInBudget = rows.some(row => row.name === "countInBudget");
+                const statements: string[] = [];
+                if (!hasSyncId) {
+                    statements.push("ALTER TABLE record ADD COLUMN syncId INTEGER DEFAULT 0;");
+                }
+                if (!hasCountInBudget) {
+                    statements.push("ALTER TABLE record ADD COLUMN countInBudget BOOLEAN DEFAULT 1;");
+                }
+                if (statements.length === 0) {
+                    resolve();
+                    return;
+                }
+                db.exec(statements.join("\n"), (alterErr) => {
+                    if (alterErr) {
+                        logError("Upgrade record table failed, error:" + alterErr.message);
+                    } else {
+                        logInfo("Record table columns upgraded.");
+                    }
+                    resolve();
+                });
             });
-        }
+        };
+
+        db.exec(createPayrollTableSql, (tableErr) => {
+            if (tableErr) {
+                logError("Create payroll tables failed, error:" + tableErr.message);
+            }
+            db.all("PRAGMA table_info(salary_record);", (salaryErr, salaryRows: any[]) => {
+                if (salaryErr) {
+                    logError("Check salary columns failed, error:" + salaryErr.message);
+                    upgradeRecordColumns();
+                    return;
+                }
+                if (salaryRows.some((row) => row.name === "taxManual")) {
+                    upgradeRecordColumns();
+                    return;
+                }
+                db.run("ALTER TABLE salary_record ADD COLUMN taxManual BOOLEAN DEFAULT 0;", (alterErr) => {
+                    if (alterErr) {
+                        logError("Add salary taxManual failed, error:" + alterErr.message);
+                    } else {
+                        logInfo("Salary table column taxManual added.");
+                    }
+                    upgradeRecordColumns();
+                });
+            });
+        });
     });
 }
 
@@ -159,10 +285,10 @@ export function databaseListen() {
         }
     })
 
-    ipcMain.handle(IpcType.YEARLY_DATA, async (event, years) => {
+    ipcMain.handle(IpcType.YEARLY_DATA, async (event, years, recordType) => {
         logInfo("will fetch yearly data");
         try {
-            const result = await yearlyData(JSON.parse(years) as number[]);
+            const result = await yearlyData(JSON.parse(years) as number[], normalizeRecordType(recordType));
             logInfo("fetch yearly data success");
             return handleResult(result);
         }
@@ -198,10 +324,10 @@ export function databaseListen() {
         }
     })
 
-    ipcMain.handle(IpcType.YEARLY_CATEGORY_DATA, async (event, year, category) => {
+    ipcMain.handle(IpcType.YEARLY_CATEGORY_DATA, async (event, year, category, recordType) => {
         logInfo("will fetch total amount by category in years");
         try {
-            const result = await getTopSubCategoryByYear(year, category);
+            const result = await getTopSubCategoryByYear(year, category, normalizeRecordType(recordType));
             logInfo("fetch total amount by category in years success");
             return handleResult(result);
         }
@@ -211,10 +337,10 @@ export function databaseListen() {
         }
     })
 
-    ipcMain.handle(IpcType.YEARLY_TOTAL_CATEGORY, async (event, year) => {
+    ipcMain.handle(IpcType.YEARLY_TOTAL_CATEGORY, async (event, year, recordType) => {
         logInfo("will fetch total amount by category in years");
         try {
-            const result = await getYearlyTotalInfo(year);
+            const result = await getYearlyTotalInfo(year, normalizeRecordType(recordType));
             logInfo("fetch total amount by category in years success");
             return handleResult(result);
         }
@@ -303,6 +429,126 @@ export function databaseListen() {
             return handleError(error);
         }
     })
+
+    ipcMain.handle(IpcType.FETCH_PAYROLL_DATA, async () => {
+        try {
+            return handleResult(await fetchPayrollData());
+        } catch (error: unknown) {
+            logError("Fetching payroll data failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.CREATE_SALARY, async (event, salary) => {
+        try {
+            const parsed = JSON.parse(salary) as SalaryRecord;
+            const id = await createSalary(parsed);
+            await recalculateSalaryYear(new Date(dayStart(parsed.date)).getFullYear());
+            return handleResult(id);
+        } catch (error: unknown) {
+            logError("Creating salary failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.UPDATE_SALARY, async (event, salary) => {
+        try {
+            const parsed = JSON.parse(salary) as SalaryRecord;
+            const previous = await dbGet(
+                "SELECT date FROM salary_record WHERE id = ?",
+                [parsed.id]
+            ) as { date: number } | undefined;
+            const id = await updateSalary(parsed);
+            const newYear = new Date(dayStart(parsed.date)).getFullYear();
+            const years = new Set<number>([newYear]);
+            if (previous && previous.date) {
+                years.add(new Date(Number(previous.date)).getFullYear());
+            }
+            for (const year of years) {
+                await recalculateSalaryYear(year);
+            }
+            return handleResult(id);
+        } catch (error: unknown) {
+            logError("Updating salary failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.DELETE_SALARY, async (event, id) => {
+        try {
+            const previous = await dbGet(
+                "SELECT date FROM salary_record WHERE id = ?",
+                [Number(id)]
+            ) as { date: number } | undefined;
+            await deleteSalary(Number(id));
+            if (previous && previous.date) {
+                await recalculateSalaryYear(new Date(Number(previous.date)).getFullYear());
+            }
+            return handleResult(Number(id));
+        } catch (error: unknown) {
+            logError("Deleting salary failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.CREATE_BONUS, async (event, bonus) => {
+        try {
+            return handleResult(await createBonus(JSON.parse(bonus) as AnnualBonus));
+        } catch (error: unknown) {
+            logError("Creating bonus failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.UPDATE_BONUS, async (event, bonus) => {
+        try {
+            return handleResult(await updateBonus(JSON.parse(bonus) as AnnualBonus));
+        } catch (error: unknown) {
+            logError("Updating bonus failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.DELETE_BONUS, async (event, id) => {
+        try {
+            return handleResult(await deleteBonus(Number(id)));
+        } catch (error: unknown) {
+            logError("Deleting bonus failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.SAVE_BUDGETS, async (event, budgets) => {
+        try {
+            return handleResult(await saveBudgets(JSON.parse(budgets) as BudgetItem[]));
+        } catch (error: unknown) {
+            logError("Saving budgets failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.FETCH_BUDGET_EXPENSE, async (event, start, end) => {
+        try {
+            return handleResult(await fetchBudgetExpense(Number(start), Number(end)));
+        } catch (error: unknown) {
+            logError("Fetching budget expense failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.IMPORT_PAYROLL, async (event, payload) => {
+        try {
+            return handleResult(await importPayroll(JSON.parse(payload)));
+        } catch (error: unknown) {
+            logError("Importing payroll failed:" + error);
+            return handleError(error);
+        }
+    })
+}
+
+// 年度分析支持按收入/支出切换，这里统一收敛入参
+function normalizeRecordType(recordType: unknown): "支出" | "收入" {
+    return recordType === "收入" ? "收入" : "支出";
 }
 
 async function fetchTotalAmountByFilter(filter: string) {
@@ -336,7 +582,7 @@ async function fetchTotalAmountByFilter(filter: string) {
 
     logInfo("fetch total amount by filter sql:" + sql);
 
-    return new Promise((resolve, reject) => {
+    const recordTotal = await new Promise<{ income: number; outcome: number }>((resolve, reject) => {
         db.get(sql, params, (err, row: any) => {
             if (err) {
                 reject(new Error(ErrorType.DATA_BASE_ERROR));
@@ -345,6 +591,31 @@ async function fetchTotalAmountByFilter(filter: string) {
             }
         });
     });
+
+    // 工资/年终奖的实际到手计入总览收入；按类别或关键字筛选时不做叠加。
+    const includePayroll = (!types || types.length === 0 || types.includes("收入"))
+        && (!categorys || categorys.length === 0)
+        && !keyword;
+    if (includePayroll) {
+        const payrollIncome = await fetchPayrollIncomeInRange(
+            startTime ? new Date(startTime).getTime() : undefined,
+            endTime ? new Date(endTime).getTime() : undefined
+        );
+        recordTotal.income += payrollIncome;
+    }
+    return recordTotal;
+}
+
+async function fetchPayrollIncomeInRange(startTime?: number, endTime?: number): Promise<number> {
+    const start = startTime === undefined ? 0 : startTime;
+    const end = endTime === undefined ? Number.MAX_SAFE_INTEGER : endTime;
+    const row = await dbGet(
+        `SELECT
+            (SELECT IFNULL(SUM(netPay), 0) FROM salary_record WHERE isDeleted = 0 AND date >= ? AND date <= ?) +
+            (SELECT IFNULL(SUM(netPay), 0) FROM annual_bonus WHERE isDeleted = 0 AND date >= ? AND date <= ?) AS total`,
+        [start, end, start, end]
+    ) as { total: number };
+    return Number((row as { total: number }).total) || 0;
 }
 
 async function createRecord(record: Record): Promise<number> {
@@ -369,8 +640,8 @@ async function createRecord(record: Record): Promise<number> {
     const timestamp = dateObj.getTime();
     const row = await new Promise((resolve, reject) => {
         db.run(
-            "INSERT INTO record (date, type, subCategory, category, amount, remark) VALUES (?, ?, ?, ?, ?, ?)",
-            [timestamp, type, subCategory, category, amount, remark],
+            "INSERT INTO record (date, type, subCategory, category, amount, remark, countInBudget) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [timestamp, type, subCategory, category, amount, remark, record.countInBudget === 0 ? 0 : 1],
             function (err) {
                 if (err) {
                     reject(new Error(ErrorType.DATA_BASE_ERROR));
@@ -424,7 +695,7 @@ async function fetchRecordsByFilter(filter: string): Promise<Record[]> {
 }
 
 async function fetchTotalAmount(): Promise<{ income: number; outcome: number }> {
-    return new Promise((resolve, reject) => {
+    const total = await new Promise<{ income: number; outcome: number }>((resolve, reject) => {
         const sql = `
             SELECT
                 SUM(CASE WHEN type = '收入' THEN amount ELSE 0 END) AS income,
@@ -440,6 +711,8 @@ async function fetchTotalAmount(): Promise<{ income: number; outcome: number }> 
             }
         });
     });
+    total.income += await fetchPayrollIncomeInRange();
+    return total;
 }
 
 async function updateRecord(record: Record, addSyncId: Boolean): Promise<number> {
@@ -478,8 +751,8 @@ async function updateRecord(record: Record, addSyncId: Boolean): Promise<number>
 
     const row = await new Promise((resolve, reject) => {
         db.run(
-            "UPDATE record SET date = ?, type = ?, subCategory = ?, category = ?, amount = ?, remark = ?, isDeleted = ?, syncId = ? WHERE id = ? and isDeleted = 0",
-            [timestamp, type, subCategory, category, amount, remark, record.isDeleted, newSyncId, id],
+            "UPDATE record SET date = ?, type = ?, subCategory = ?, category = ?, amount = ?, remark = ?, isDeleted = ?, syncId = ?, countInBudget = ? WHERE id = ? and isDeleted = 0",
+            [timestamp, type, subCategory, category, amount, remark, record.isDeleted, newSyncId, record.countInBudget === 0 ? 0 : 1, id],
             function (err) {
                 if (err) {
                     reject(new Error(ErrorType.DATA_BASE_ERROR));
@@ -492,15 +765,16 @@ async function updateRecord(record: Record, addSyncId: Boolean): Promise<number>
     return row;
 }
 
-async function yearlyData(years: number[]) {
+async function yearlyData(years: number[], recordType: "支出" | "收入" = "支出") {
     try {
         const queries = years.map((year) => {
             return new Promise((resolve, reject) => {
                 db.all(
-                    "SELECT category, ROUND(SUM(amount), 2) as total FROM record where date >= ? and date <= ? and isDeleted = 0 AND type = '支出' group by category",
+                    "SELECT category, ROUND(SUM(amount), 2) as total FROM record where date >= ? and date <= ? and isDeleted = 0 AND type = ? group by category",
                     [
                         new Date(year, 0, 1).getTime(),
                         new Date(year, 11, 31, 23, 59, 59, 999).getTime(),
+                        recordType,
                     ],
                     (err, rows) => {
                         if (err) {
@@ -575,20 +849,20 @@ async function getTopSubCategoryByAmount(category: string) {
 }
 
 // 获取某一年所有分类的支出信息
-async function getYearlyTotalInfo(year: number) {
-    // 获取某一年所有分类的支出信息
+async function getYearlyTotalInfo(year: number, recordType: "支出" | "收入" = "支出") {
+    // 获取某一年所有分类的收入/支出信息
     const start = new Date(year, 0, 1).getTime();
     const end = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
     const sql = `
         SELECT category, ROUND(SUM(amount), 2) as total 
         FROM record 
-        WHERE date >= ? AND date <= ? AND isDeleted = 0 AND type = '支出' 
+        WHERE date >= ? AND date <= ? AND isDeleted = 0 AND type = ? 
         GROUP BY category
     `;
-    return await dbAll(sql, [start, end]) as { category: string; total: number }[];
+    return await dbAll(sql, [start, end, recordType]) as { category: string; total: number }[];
 }
 
-async function getTopSubCategoryByYear(year: number, category: string) {
+async function getTopSubCategoryByYear(year: number, category: string, recordType: "支出" | "收入" = "支出") {
     // 封装数据库查询函数
     async function queryDb(sql: string, params: any[]) {
         return dbAll(sql, params);
@@ -600,20 +874,20 @@ async function getTopSubCategoryByYear(year: number, category: string) {
         const end = new Date(year, month + 1, 0, 23, 59, 59, 999).getTime();
 
         const totalAmount = await dbGet(
-            "SELECT ROUND(SUM(amount), 2) as total FROM record WHERE category = ? AND date >= ? AND date <= ? AND isDeleted = 0 AND type = '支出'",
-            [category, start, end]
+            "SELECT ROUND(SUM(amount), 2) as total FROM record WHERE category = ? AND date >= ? AND date <= ? AND isDeleted = 0 AND type = ?",
+            [category, start, end, recordType]
         ) as { total: number };
 
         const subCategories = await queryDb(
-            "SELECT subCategory, ROUND(SUM(amount), 2) as total FROM record WHERE category = ? AND date >= ? AND date <= ? AND isDeleted = 0 AND type = '支出' GROUP BY subCategory ORDER BY total DESC",
-            [category, start, end]
+            "SELECT subCategory, ROUND(SUM(amount), 2) as total FROM record WHERE category = ? AND date >= ? AND date <= ? AND isDeleted = 0 AND type = ? GROUP BY subCategory ORDER BY total DESC",
+            [category, start, end, recordType]
         ) as { subCategory: string; total: Number }[]
 
         const subCategoryDetails = await Promise.all(
             subCategories.map((subCategory) =>
                 queryDb(
-                    "SELECT * FROM record WHERE category = ? AND subCategory = ? AND date >= ? AND date <= ? AND isDeleted = 0 AND type = '支出' ORDER BY amount DESC",
-                    [category, subCategory.subCategory, start, end]
+                    "SELECT * FROM record WHERE category = ? AND subCategory = ? AND date >= ? AND date <= ? AND isDeleted = 0 AND type = ? ORDER BY amount DESC",
+                    [category, subCategory.subCategory, start, end, recordType]
                 ).then((records) => ({ ...subCategory, records }))
             )
         );
@@ -632,8 +906,8 @@ async function getTopSubCategoryByYear(year: number, category: string) {
     const yearStart = new Date(year, 0, 1).getTime();
     const yearEnd = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
     const totalAmount = await dbGet(
-        "SELECT ROUND(SUM(amount), 2) as total FROM record WHERE category = ? AND date >= ? AND date <= ? AND isDeleted = 0 AND type = '支出'",
-        [category, yearStart, yearEnd]
+        "SELECT ROUND(SUM(amount), 2) as total FROM record WHERE category = ? AND date >= ? AND date <= ? AND isDeleted = 0 AND type = ?",
+        [category, yearStart, yearEnd, recordType]
     ) as { total: number };
 
     return {
@@ -688,13 +962,31 @@ async function getTimeLineByYears() {
                     [start, end]
                 ) as { total: number };
 
+                const incomeTotal = await dbGet(
+                    "SELECT ROUND(SUM(amount), 2) as total FROM record WHERE date >= ? AND date <= ? AND isDeleted = 0 AND type = '收入'",
+                    [start, end]
+                ) as { total: number };
+
+                const topExpenses = await dbAll(
+                    "SELECT * FROM record WHERE date >= ? AND date <= ? AND isDeleted = 0 AND type = '支出' ORDER BY amount DESC, date DESC LIMIT 3",
+                    [start, end]
+                ) as Record[];
+
+                const largestIncome = await dbGet(
+                    "SELECT * FROM record WHERE date >= ? AND date <= ? AND isDeleted = 0 AND type = '收入' ORDER BY amount DESC, date DESC LIMIT 1",
+                    [start, end]
+                ) as Record | undefined;
+
                 return {
                     year,
                     total: totalAmount.total,
                     earliestRecord,
                     latestRecord,
                     largestAmountRecord,
+                    topExpenses,
+                    largestIncome: largestIncome || null,
                     totalRecords: totalRecords.total,
+                    incomeTotal: incomeTotal.total || 0,
                 };
             })
         );
@@ -709,7 +1001,7 @@ async function batchInsertRecords(records: Record[]) {
         throw new Error(ErrorType.RECORD_NOT_EXIST);
     } else {
         const sql =
-            "INSERT INTO record(amount, type, category, subCategory, remark, date) VALUES (?, ?, ?, ?, ?, ?)";
+            "INSERT INTO record(amount, type, category, subCategory, remark, date, countInBudget) VALUES (?, ?, ?, ?, ?, ?, ?)";
         const stmt = db.prepare(sql);
         records.forEach((record) => {
             stmt.run([
@@ -719,6 +1011,7 @@ async function batchInsertRecords(records: Record[]) {
                 record.subCategory,
                 record.remark,
                 getDaliyStart(record.date),
+                Number(record.countInBudget) === 0 ? 0 : 1,
             ]);
         });
         stmt.finalize((err) => {
@@ -834,10 +1127,9 @@ export async function getRecordsByLimit(limit: Number, offset: Number): Promise<
 }
 
 async function saveCustomCategory(newCategory: string): Promise<string> {
-    const customPath = path.join(userDataPath, "category-custom.json");
-    logInfo("save custom category to:" + customPath);
+    logInfo("save custom category to:" + customCategoryPath);
     try {
-        await fs.writeFile(customPath, newCategory);
+        await fs.writeFile(customCategoryPath, newCategory);
         return newCategory;
     } catch (err: any) {
         throw new Error(ErrorType.FILE_WIRTE_FAIL);
@@ -845,20 +1137,321 @@ async function saveCustomCategory(newCategory: string): Promise<string> {
 }
 
 async function readCustomCategory(): Promise<string> {
-    const customPath = path.join(userDataPath, "category-custom.json");
-    logInfo("read custom category from:" + customPath);
+    logInfo("read custom category from:" + customCategoryPath);
     try {
-        const data = await fs.readFile(customPath, 'utf8');
+        const data = await fs.readFile(customCategoryPath, 'utf8');
         return data;
     } catch (err: any) {
         if (err.code === 'ENOENT') {
-            logInfo("File does not exist:" + customPath);
+            logInfo("File does not exist:" + customCategoryPath);
             return ""
         } else {
             logError("Read custom category failed:" + err);
             throw new Error(ErrorType.FILE_READ_FAIL); // 抛出异常供调用者处理
         }
     }
+}
+
+// ---------- 薪酬 ----------
+
+function round2(value: number): number {
+    return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function dayStart(timestamp: number | string | Date): number {
+    let value: number;
+    if (timestamp instanceof Date) {
+        value = timestamp.getTime();
+    } else if (typeof timestamp === "number") {
+        value = timestamp;
+    } else {
+        // 日期选择器在 IPC 序列化后可能变成 ISO 字符串
+        value = new Date(timestamp).getTime();
+    }
+    const date = new Date(value);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+}
+
+export async function fetchPayrollData(): Promise<PayrollData> {
+    const salaries = await dbAll(
+        "SELECT * FROM salary_record WHERE isDeleted = 0 ORDER BY date DESC, id DESC",
+        []
+    ) as SalaryRecord[];
+    const bonuses = await dbAll(
+        "SELECT * FROM annual_bonus WHERE isDeleted = 0 ORDER BY date DESC, id DESC",
+        []
+    ) as AnnualBonus[];
+    const budgets = await dbAll(
+        "SELECT * FROM budget_item WHERE isDeleted = 0 ORDER BY id ASC",
+        []
+    ) as BudgetItem[];
+    return { salaries, bonuses, budgets };
+}
+
+async function recalculateSalaryYear(year: number): Promise<void> {
+    const start = new Date(year, 0, 1).getTime();
+    const end = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
+    const rows = await dbAll(
+        "SELECT * FROM salary_record WHERE isDeleted = 0 AND date >= ? AND date <= ? ORDER BY date ASC, id ASC",
+        [start, end]
+    ) as SalaryRecord[];
+
+    const prior: SalaryRecord[] = [];
+    for (const row of rows) {
+        // 手动微调过的记录保持原值，但仍作为后续月份已缴税额的基数
+        if (Number(row.taxManual) === 1) {
+            prior.push(row);
+            continue;
+        }
+        const result = calcSalaryTax(row, prior);
+        if (round2(row.tax) !== result.tax || round2(row.taxRate) !== result.taxRate || round2(row.netPay) !== result.netPay) {
+            row.tax = result.tax;
+            row.taxRate = result.taxRate;
+            row.netPay = result.netPay;
+            await new Promise<void>((resolve, reject) => {
+                db.run(
+                    "UPDATE salary_record SET tax = ?, taxRate = ?, netPay = ?, syncId = syncId + 1 WHERE id = ?",
+                    [result.tax, result.taxRate, result.netPay, row.id],
+                    (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+                );
+            });
+        }
+        prior.push(row);
+    }
+}
+
+async function createSalary(salary: SalaryRecord): Promise<number> {
+    const row = await new Promise<number>((resolve, reject) => {
+        db.run(
+            `INSERT INTO salary_record
+             (date, baseSalary, overtimePay, oneTimeBonus, socialInsurance, tax, taxRate, netPay, taxManual)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                dayStart(salary.date),
+                round2(salary.baseSalary),
+                round2(salary.overtimePay),
+                round2(salary.oneTimeBonus),
+                round2(salary.socialInsurance),
+                round2(salary.tax),
+                round2(salary.taxRate),
+                round2(salary.netPay),
+                Number(salary.taxManual) === 1 ? 1 : 0,
+            ],
+            function (err) {
+                if (err) {
+                    logError("insert salary failed: " + err.message + ", date=" + salary.date);
+                    reject(new Error(ErrorType.DATA_BASE_ERROR));
+                } else {
+                    resolve(this.lastID);
+                }
+            }
+        );
+    });
+    return row;
+}
+
+async function updateSalary(salary: SalaryRecord): Promise<number> {
+    if (!salary.id) {
+        throw new Error(ErrorType.RECORD_NOT_EXIST);
+    }
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            `UPDATE salary_record SET date = ?, baseSalary = ?, overtimePay = ?, oneTimeBonus = ?,
+             socialInsurance = ?, tax = ?, taxRate = ?, netPay = ?, taxManual = ?, syncId = syncId + 1
+             WHERE id = ? AND isDeleted = 0`,
+            [
+                dayStart(salary.date),
+                round2(salary.baseSalary),
+                round2(salary.overtimePay),
+                round2(salary.oneTimeBonus),
+                round2(salary.socialInsurance),
+                round2(salary.tax),
+                round2(salary.taxRate),
+                round2(salary.netPay),
+                Number(salary.taxManual) === 1 ? 1 : 0,
+                salary.id,
+            ],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return salary.id;
+}
+
+async function deleteSalary(id: number): Promise<number> {
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            "UPDATE salary_record SET isDeleted = 1, syncId = syncId + 1 WHERE id = ?",
+            [id],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return id;
+}
+
+async function createBonus(bonus: AnnualBonus): Promise<number> {
+    const row = await new Promise<number>((resolve, reject) => {
+        db.run(
+            `INSERT INTO annual_bonus (date, bonus, tax, taxRate, netPay)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+                dayStart(bonus.date),
+                round2(bonus.bonus),
+                round2(bonus.tax),
+                round2(bonus.taxRate),
+                round2(bonus.netPay),
+            ],
+            function (err) {
+                if (err) {
+                    reject(new Error(ErrorType.DATA_BASE_ERROR));
+                } else {
+                    resolve(this.lastID);
+                }
+            }
+        );
+    });
+    return row;
+}
+
+async function updateBonus(bonus: AnnualBonus): Promise<number> {
+    if (!bonus.id) {
+        throw new Error(ErrorType.RECORD_NOT_EXIST);
+    }
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            `UPDATE annual_bonus SET date = ?, bonus = ?, tax = ?, taxRate = ?, netPay = ?,
+             syncId = syncId + 1 WHERE id = ? AND isDeleted = 0`,
+            [
+                dayStart(bonus.date),
+                round2(bonus.bonus),
+                round2(bonus.tax),
+                round2(bonus.taxRate),
+                round2(bonus.netPay),
+                bonus.id,
+            ],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return bonus.id;
+}
+
+async function deleteBonus(id: number): Promise<number> {
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            "UPDATE annual_bonus SET isDeleted = 1, syncId = syncId + 1 WHERE id = ?",
+            [id],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return id;
+}
+
+async function saveBudgets(items: BudgetItem[]): Promise<BudgetItem[]> {
+    const existing = await dbAll(
+        "SELECT id FROM budget_item WHERE isDeleted = 0",
+        []
+    ) as { id: number }[];
+    const keepIds = items.filter((item) => item.id > 0).map((item) => item.id);
+
+    for (const item of items) {
+        if (!item.name || !item.name.trim()) {
+            continue;
+        }
+        const name = item.name.trim();
+        const amount = round2(item.amount);
+        if (item.id > 0) {
+            await new Promise<void>((resolve, reject) => {
+                db.run(
+                    "UPDATE budget_item SET name = ?, amount = ?, syncId = syncId + 1 WHERE id = ? AND isDeleted = 0",
+                    [name, amount, item.id],
+                    (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+                );
+            });
+        } else {
+            await new Promise<void>((resolve, reject) => {
+                db.run(
+                    "INSERT INTO budget_item (name, amount) VALUES (?, ?)",
+                    [name, amount],
+                    (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+                );
+            });
+        }
+    }
+
+    const removed = existing.filter((item) => !keepIds.includes(item.id));
+    for (const item of removed) {
+        await new Promise<void>((resolve, reject) => {
+            db.run(
+                "UPDATE budget_item SET isDeleted = 1, syncId = syncId + 1 WHERE id = ?",
+                [item.id],
+                (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+            );
+        });
+    }
+
+    return dbAll(
+        "SELECT * FROM budget_item WHERE isDeleted = 0 ORDER BY id ASC",
+        []
+    ) as Promise<BudgetItem[]>;
+}
+
+async function fetchBudgetExpense(start: number, end: number): Promise<number> {
+    const row = await dbGet(
+        "SELECT IFNULL(SUM(amount), 0) AS total FROM record WHERE isDeleted = 0 AND type = '支出' AND countInBudget = 1 AND date >= ? AND date <= ?",
+        [start, end]
+    ) as { total: number };
+    return Number((row as { total: number }).total) || 0;
+}
+
+export async function importPayroll(payload: { salaries?: SalaryRecord[]; bonuses?: AnnualBonus[]; budgets?: BudgetItem[] }) {
+    let insertedSalaries = 0;
+    for (const salary of payload.salaries || []) {
+        const date = dayStart(salary.date);
+        const exists = await dbGet(
+            "SELECT id FROM salary_record WHERE isDeleted = 0 AND date = ? AND baseSalary = ? AND overtimePay = ? AND oneTimeBonus = ? AND socialInsurance = ?",
+            [date, round2(salary.baseSalary), round2(salary.overtimePay), round2(salary.oneTimeBonus), round2(salary.socialInsurance)]
+        );
+        if (!exists) {
+            await createSalary({ ...salary, date, taxManual: 1 });
+            insertedSalaries += 1;
+        }
+    }
+
+    let insertedBonuses = 0;
+    for (const bonus of payload.bonuses || []) {
+        const date = dayStart(bonus.date);
+        const exists = await dbGet(
+            "SELECT id FROM annual_bonus WHERE isDeleted = 0 AND date = ? AND bonus = ?",
+            [date, round2(bonus.bonus)]
+        );
+        if (!exists) {
+            await createBonus({ ...bonus, date });
+            insertedBonuses += 1;
+        }
+    }
+
+    let insertedBudgets = 0;
+    for (const budget of payload.budgets || []) {
+        if (!budget.name) {
+            continue;
+        }
+        const exists = await dbGet(
+            "SELECT id FROM budget_item WHERE isDeleted = 0 AND name = ?",
+            [budget.name.trim()]
+        );
+        if (!exists) {
+            await new Promise<void>((resolve, reject) => {
+                db.run(
+                    "INSERT INTO budget_item (name, amount) VALUES (?, ?)",
+                    [budget.name.trim(), round2(budget.amount)],
+                    (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+                );
+            });
+            insertedBudgets += 1;
+        }
+    }
+
+    return { insertedSalaries, insertedBonuses, insertedBudgets };
 }
 
 function getDaliyStart(date: Date) {

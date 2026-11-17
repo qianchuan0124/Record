@@ -55,18 +55,25 @@ function handleFilterChanged(filter: Filter) {
 
 .content-container {
   display: flex;
-  align-items: flex-start;
+  flex: 1;
+  align-items: stretch;
   gap: 16px;
   width: 100%;
+  min-height: 0;
 }
 
 .month-select-container {
+  display: flex;
   flex: 0 0 220px;
   width: 220px;
+  min-height: 0;
 }
 
 .content-table-container {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 </style>

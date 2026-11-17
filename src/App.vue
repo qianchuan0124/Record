@@ -1,9 +1,6 @@
 <template>
   <div class="common-layout">
     <el-container>
-      <el-header>
-        <TopBar></TopBar>
-      </el-header>
       <el-main>
         <Home></Home>
       </el-main>
@@ -13,7 +10,6 @@
 
 <script lang="ts" setup>
 import { onMounted } from "vue";
-import TopBar from "./components/TopBar.vue";
 import Home from "./components/MainHome.vue";
 import Color from "@/configs/Color.json";
 
@@ -96,12 +92,6 @@ body {
 .common-layout > .el-container {
   height: 100%;
   flex-direction: column;
-}
-
-.el-header {
-  height: 60px !important;
-  padding: 0 !important;
-  flex: 0 0 auto;
 }
 
 .el-main {

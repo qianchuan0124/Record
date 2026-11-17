@@ -78,7 +78,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import type Node from "element-plus/es/components/tree/src/model/node";
 import type { AllowDropType } from "element-plus/es/components/tree/src/tree.type";
 import { getCategorySettingNode } from "./Manager";
@@ -88,6 +88,7 @@ import { ElMessage } from "element-plus";
 import cloneDeep from "lodash/cloneDeep";
 import L10n from "@/configs/L10n.json";
 import { updateCurrentCategory } from "@/configs/CategoryParser";
+import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 const addFormVisible = ref(false);
 const saveVisible = ref(false);
 const newCategory = ref("");
@@ -101,7 +102,7 @@ const tipInfo = ref("");
 const tipType = ref<"save" | "restore" | "default">("save");
 const expandNodeList = ref<string[]>([L10n.all]);
 
-onMounted(async () => {
+async function loadCategory() {
   try {
     const data = await getCategorySettingNode("current");
     dataSource.value = data;
@@ -114,6 +115,15 @@ onMounted(async () => {
       ElMessage.error(L10n.system_error);
     }
   }
+}
+
+onMounted(() => {
+  loadCategory();
+  notifyCenter.on(NotifyType.CATEGORY_DATA_UPDATE, loadCategory);
+});
+
+onUnmounted(() => {
+  notifyCenter.off(NotifyType.CATEGORY_DATA_UPDATE, loadCategory);
 });
 
 const handleTipAction = () => {
@@ -322,16 +332,17 @@ const allowDrop = (draggingNode: Node, dropNode: Node, type: AllowDropType) => {
 
 .custom-category {
   width: 100%;
-  height: 500px;
-  padding: 8px;
-  border: 1px solid #ebecf0;
-  border-radius: 10px;
+  height: 100%;
+  min-height: 360px;
+  padding: 2px 6px 2px 0;
   overflow-y: auto;
 }
 
 .custom-category .el-tree {
+  padding: 2px 0;
   background: transparent;
 }
+
 
 .custom-category .el-tree-node__content {
   height: 32px;
@@ -339,6 +350,6 @@ const allowDrop = (draggingNode: Node, dropNode: Node, type: AllowDropType) => {
 }
 
 .custom-category .el-tree-node__content:hover {
-  background-color: #f6f6f9;
+  background-color: #f6f5fb;
 }
 </style>

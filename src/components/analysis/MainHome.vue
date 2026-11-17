@@ -35,13 +35,37 @@ const activeName = ref("first");
 
 <style scoped>
 .container {
+  display: flex;
+  flex-direction: column;
   height: 100%;
   padding: 16px 24px 24px 16px;
   overflow-y: auto;
 }
 
+.analysis-tabs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .analysis-tabs :deep(.el-tabs__header) {
-  margin: 0 0 12px;
+  flex: 0 0 auto;
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  background-color: #ffffff;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
+}
+
+.analysis-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.analysis-tabs :deep(.el-tab-pane) {
+  height: 100%;
 }
 
 .analysis-tabs :deep(.el-tabs__nav-wrap::after) {
@@ -87,10 +111,6 @@ const activeName = ref("first");
   background-color: white;
   color: #6c5dd3;
   box-shadow: 0 1px 2px rgba(27, 31, 39, 0.08);
-}
-
-.analysis-tabs :deep(.el-tabs__content) {
-  overflow: visible;
 }
 
 .analysis-title {

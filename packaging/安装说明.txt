@@ -1,0 +1,14 @@
+记账清单 __VERSION__（Apple Silicon）
+
+安装
+1. 双击 dmg
+2. 将「记账清单」拖到 Applications 文件夹
+3. 首次打开如果提示「无法验证开发者」，右键点击应用选择「打开」；
+   macOS 15 及以上请在「系统设置 → 隐私与安全性」中点击「仍要打开」
+
+升级
+下载新版本 dmg，覆盖安装到 Applications 即可，本地数据不受影响。
+
+说明
+- 未使用 Apple 开发者证书签名，仅限公司内网使用
+- 应用数据保存在 ~/Library/Application Support/记账清单/

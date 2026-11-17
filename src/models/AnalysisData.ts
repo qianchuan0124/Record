@@ -45,7 +45,10 @@ export interface TimeLineRecord {
     year: number;
     totalRecords: number;
     total: number;
+    incomeTotal: number;
     earliestRecord: Record;
     latestRecord: Record;
     largestAmountRecord: Record;
+    topExpenses: Record[];
+    largestIncome: Record | null;
 }

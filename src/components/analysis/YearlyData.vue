@@ -22,6 +22,15 @@
           size="small"
           @change="onYearEndChanged"
           :clearable="false" />
+        <el-radio-group
+          v-if="showModeSwitch"
+          v-model="recordMode"
+          class="mode-switch"
+          size="small"
+          @change="onModeChanged">
+          <el-radio-button value="expense">{{ L10n.expense }}</el-radio-button>
+          <el-radio-button value="income">{{ L10n.income }}</el-radio-button>
+        </el-radio-group>
       </div>
       <div ref="myEchart" class="chart"></div>
     </div>
@@ -115,7 +124,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, ref, onDeactivated, onUnmounted, nextTick } from "vue";
+import { computed, onMounted, ref, onDeactivated, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts";
 import {
   fetchYearlyAnalysis,
@@ -126,7 +135,7 @@ import {
 import L10n from "@/configs/L10n.json";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { ElMessage } from "element-plus";
-import { logError } from "@/utils/DataCenter";
+import { fetchTotalAmountByFilter, logError } from "@/utils/DataCenter";
 const startYear = ref<string>((new Date().getFullYear() - 4).toString());
 const endYear = ref<string>(new Date().getFullYear().toString());
 
@@ -192,9 +201,88 @@ function currentYearsList() {
   });
 }
 
+interface YearTotal {
+  income: number;
+  outcome: number;
+}
+
+const yearTotals = ref<Record<string, YearTotal>>({});
+type RecordMode = "expense" | "income";
+const recordMode = ref<RecordMode>("expense");
+const showModeSwitch = computed(() => {
+  const totals = Object.values(yearTotals.value);
+  const income = totals.reduce((sum, item) => sum + item.income, 0);
+  const outcome = totals.reduce((sum, item) => sum + item.outcome, 0);
+  return income > 0 && outcome > 0;
+});
+const currentRecordType = computed<"支出" | "收入">(() =>
+  recordMode.value === "income" ? "收入" : "支出"
+);
+
+function onModeChanged() {
+  closeDetail();
+  reloadData();
+}
+
+async function loadYearTotals(years: string[]) {
+  yearTotals.value = {};
+  const entries = await Promise.all(
+    years.map(async (year) => {
+      const filter = JSON.stringify({
+        types: [],
+        categorys: [],
+        keyword: "",
+        startTime: new Date(Number(year), 0, 1),
+        endTime: new Date(Number(year), 11, 31, 23, 59, 59, 999),
+        isAll: true,
+      });
+      const total = await fetchTotalAmountByFilter(filter);
+      return [year, { income: total.income, outcome: total.outcome }] as const;
+    })
+  );
+  const result: Record<string, YearTotal> = {};
+  for (const [year, total] of entries) {
+    result[year] = total;
+  }
+  yearTotals.value = result;
+}
+
+function formatYearAmount(value: number): string {
+  return value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// 年份下方只展示当前模式的合计，全年为 0 时不显示金额
+function formatYearAxisLabel(year: string): string {
+  const total = yearTotals.value[year];
+  if (!total) {
+    return `{year|${year}}`;
+  }
+  const isIncome = recordMode.value === "income";
+  const amount = isIncome ? total.income : total.outcome;
+  if (!amount || amount <= 0) {
+    return `{year|${year}}`;
+  }
+  const style = isIncome ? "income" : "expense";
+  const label = isIncome ? L10n.income : L10n.expense;
+  return [`{year|${year}}`, `{${style}|${label} ${formatYearAmount(amount)}}`].join("\n");
+}
+
 async function reloadData() {
   try {
-    const analysisData = await fetchYearlyAnalysis(currentYearsList());
+    const years = currentYearsList();
+    await loadYearTotals(years).catch((error) => {
+      logError("load yearly totals failed " + error);
+    });
+    const totals = Object.values(yearTotals.value);
+    const totalIncome = totals.reduce((sum, item) => sum + item.income, 0);
+    const totalOutcome = totals.reduce((sum, item) => sum + item.outcome, 0);
+    // 没有收入时固定展示支出，反之亦然
+    if (totalIncome <= 0) {
+      recordMode.value = "expense";
+    } else if (totalOutcome <= 0) {
+      recordMode.value = "income";
+    }
+    const analysisData = await fetchYearlyAnalysis(years, currentRecordType.value);
     const descriptions = analysisData[0].description;
     const option = {
       color: [
@@ -220,6 +308,7 @@ async function reloadData() {
         orient: "vertical",
         left: 10,
         top: 10,
+        selectedMode: false,
       },
       grid: {
         left: "15%",
@@ -231,6 +320,33 @@ async function reloadData() {
         {
           type: "category",
           data: descriptions,
+          axisTick: { alignWithLabel: true },
+          axisLabel: {
+            interval: 0,
+            margin: 12,
+            formatter: (value: string) => formatYearAxisLabel(value),
+            rich: {
+              year: {
+                fontSize: 13,
+                fontWeight: 600,
+                color: "#1b1f27",
+                lineHeight: 20,
+                align: "center",
+              },
+              expense: {
+                fontSize: 11,
+                color: "#e2434f",
+                lineHeight: 16,
+                align: "center",
+              },
+              income: {
+                fontSize: 11,
+                color: "#18a472",
+                lineHeight: 16,
+                align: "center",
+              },
+            },
+          },
         },
       ],
       yAxis: [
@@ -262,7 +378,7 @@ async function reloadData() {
 }
 
 const yearlyChart = ref<echarts.ECharts | null>(null);
-let chartObserver: IntersectionObserver | null = null;
+let chartObserver: ResizeObserver | null = null;
 // 首次 setOption 会走 ECharts 的初始化分支（initBase），此后 resize 无法重建坐标系；
 // 先落一次空坐标系配置，让数据渲染走 merge 分支，保证 resize / 切回页签稳定
 let baseReady = false;
@@ -325,6 +441,9 @@ function setupChart(): boolean {
   window.addEventListener("resize", resizeChart);
   reloadData();
   yearlyChart.value.on("click", function (params) {
+    if (params.componentType !== "series") {
+      return;
+    }
     const category = params.seriesName;
     const year = Number(params.name);
     currentYear.value = year;
@@ -342,11 +461,8 @@ onMounted(() => {
     return;
   }
   setupChart();
-  // 首次显示时初始化，之后每次显示时按新尺寸重绘
-  chartObserver = new IntersectionObserver((entries) => {
-    if (!entries.some((entry) => entry.isIntersecting)) {
-      return;
-    }
+  // 页签隐藏时容器尺寸为 0，初始化会失败；用 ResizeObserver 在容器尺寸变化时补初始化/重绘
+  chartObserver = new ResizeObserver(() => {
     if (!yearlyChart.value) {
       setupChart();
     } else {
@@ -358,7 +474,7 @@ onMounted(() => {
 
 async function reloadDetailValues(year: number, category: string) {
   try {
-    data.value = [await generateYearlyCategoryNode(year, category)];
+    data.value = [await generateYearlyCategoryNode(year, category, currentRecordType.value)];
     detailVisible.value = true;
     await nextTick();
     updateTreeHeight();
@@ -377,7 +493,7 @@ async function onTapTotal() {
 
 async function reloadYearlyTotalInfo(year: number) {
   try {
-    data.value = [await generateYearlyTotalInfo(year)];
+    data.value = [await generateYearlyTotalInfo(year, currentRecordType.value)];
     detailVisible.value = true;
     await nextTick();
     updateTreeHeight();
@@ -407,7 +523,7 @@ const data = ref<CategoryNode[]>([]);
   display: flex;
   align-items: stretch;
   width: 100%;
-  height: calc(100vh - 200px);
+  height: 100%;
   min-height: 520px;
   padding: 8px 20px 12px 8px;
   overflow: hidden;
@@ -439,6 +555,17 @@ const data = ref<CategoryNode[]>([]);
 .select-year-tip-end {
   margin: 0;
   user-select: none !important;
+}
+
+.mode-switch {
+  margin-left: 4px;
+}
+
+.mode-switch :deep(.el-radio-button__inner) {
+  height: 24px;
+  padding: 0 12px;
+  line-height: 22px;
+  font-size: 12px;
 }
 
 .chart {

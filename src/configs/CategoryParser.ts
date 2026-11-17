@@ -22,8 +22,12 @@ export async function updateCurrentCategory() {
         // 以json格式发送post请求，用record填充请求体
         const data = await fetchCustomCategory();
         if (data != null && data.length > 0) {
-            currentCategory = data as CategoryNodeItem[]
-            notifyCenter.emit(NotifyType.CATEGORY_DATA_UPDATE);
+            // 内容没变化时不再广播，避免监听方刷新后再次触发更新造成循环
+            const nextCategory = data as CategoryNodeItem[]
+            if (JSON.stringify(nextCategory) !== JSON.stringify(currentCategory)) {
+                currentCategory = nextCategory
+                notifyCenter.emit(NotifyType.CATEGORY_DATA_UPDATE);
+            }
         }
     }
     catch (error: unknown) {

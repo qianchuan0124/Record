@@ -1,6 +1,6 @@
 import * as http from 'http'
 import * as os from 'os'
-import { getRecordsCount, getRecordsByLimit, insertRecordsIfNeeded } from '@/db/Database'
+import { fetchPayrollData, getRecordsCount, getRecordsByLimit, importPayroll, insertRecordsIfNeeded } from '@/db/Database'
 import { parse } from 'url';
 import { BrowserWindow, ipcMain } from "electron";
 import { IpcType } from '@/models/IpcResponse'
@@ -72,6 +72,45 @@ export function openServer(win: BrowserWindow): Promise<string> {
                 return
             }
 
+        } else if (req.method === 'GET' && req.url === '/sync/payroll/result') {
+            logInfo('receive sync get payroll result')
+            try {
+                const payroll = await fetchPayrollData()
+                res.end(JSON.stringify({ result: true, ...payroll }))
+            } catch (error) {
+                if (error instanceof Error) {
+                    logError("sync get payroll failed:" + error)
+                    res.end(JSON.stringify({ result: false, err: error.message }))
+                } else {
+                    logError("sync get payroll failed:" + error)
+                    res.end(JSON.stringify({ result: false, err: L10n.unknown_error }))
+                }
+            }
+        } else if (req.method === 'POST' && req.url === '/sync/payroll/result') {
+            logInfo('receive sync post payroll result')
+            let body = '';
+            req.on('data', (chunk: Buffer) => {
+                body += chunk.toString();
+            });
+            req.on('end', async () => {
+                try {
+                    const parsedBody = JSON.parse(body);
+                    const result = await importPayroll({
+                        salaries: parsedBody.salaries || [],
+                        bonuses: parsedBody.bonuses || [],
+                        budgets: parsedBody.budgets || [],
+                    })
+                    res.end(JSON.stringify({ result: true, ...result }))
+                } catch (error) {
+                    if (error instanceof Error) {
+                        logError("sync post payroll failed:" + error)
+                        res.end(JSON.stringify({ result: false, err: error.message }))
+                    } else {
+                        logError("sync post payroll failed:" + error)
+                        res.end(JSON.stringify({ result: false, err: L10n.unknown_error }))
+                    }
+                }
+            });
         } else if (req.method === 'POST' && req.url === '/sync/records/result') {
             logInfo('receive sync post result')
             let body = '';

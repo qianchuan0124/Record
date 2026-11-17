@@ -99,8 +99,9 @@ const categoryProps = {
 const categoriesOptions = ref(getCategories());
 const typeOptions = accountTypes;
 
-const categoryValue = ref(["guide", "disciplines"]);
-const typeValue = ref(["expense"]);
+// 不预置占位值：否则只点开筛选框再关闭，也会把占位值当成筛选条件导致列表被清空
+const categoryValue = ref<string[]>([]);
+const typeValue = ref<string[]>([]);
 const selectedTime = ref<[Date, Date]>([
   new Date(2000, 10, 10, 10, 10),
   new Date(2000, 10, 11, 10, 10),
@@ -168,7 +169,7 @@ const calculateDimensions = () => {
     case "all":
       width.value = "30px";
       height.value = "30px";
-      buttonWidth.value = "56px";
+      buttonWidth.value = "88px";
       break;
     case "remark":
       width.value = "196px";
@@ -262,15 +263,14 @@ onDeactivated(() => {
 <style scoped>
 .button-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: #5a6274;
 }
 
 .button-title-select {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: inherit;
-  margin-left: 2px;
   white-space: nowrap;
 }
 
@@ -282,16 +282,17 @@ onDeactivated(() => {
 .button-style {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 2px;
   width: v-bind("buttonWidth");
   height: v-bind("height");
-  padding: 0 6px;
+  padding: 0 12px;
   background-color: white;
   border: 1px solid #e3e5ea;
   border-radius: 8px;
   color: #5a6274;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease,
     color 0.15s ease;
@@ -302,11 +303,12 @@ onDeactivated(() => {
   align-items: center;
   width: v-bind("buttonWidth");
   height: v-bind("height");
-  padding: 0 8px;
+  padding: 0 12px;
   background-color: white;
   border: 1px solid #e3e5ea;
   border-radius: 8px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
@@ -343,7 +345,14 @@ onDeactivated(() => {
 
 :deep(.button-search .el-input__inner) {
   width: v-bind("width") !important;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1b1f27;
+}
+
+:deep(.button-search .el-input__inner::placeholder) {
+  font-weight: 400;
+  color: #a4a9b6;
 }
 
 :deep(.el-input__prefix) {

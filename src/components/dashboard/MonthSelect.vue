@@ -231,7 +231,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   width: 220px;
-  height: calc(100vh - 336px);
+  height: 100%;
   min-height: 320px;
   background-color: white;
   border: 1px solid #ebecf0;

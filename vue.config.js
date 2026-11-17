@@ -1,4 +1,8 @@
 const { defineConfig } = require("@vue/cli-service");
+
+// RECORD_DIST=1 时只产出未打包的 .app，由 scripts/dist-mac.sh 完成签名、zip 和 dmg。
+const isInternalDist = process.env.RECORD_DIST === "1";
+
 module.exports = defineConfig({
   transpileDependencies: true,
   devServer: {
@@ -20,6 +24,7 @@ module.exports = defineConfig({
         appId: "org.electron.record",
         mac: {
           icon: "./build/icons/icon.icns",
+          target: isInternalDist ? ["dir"] : undefined,
           extendInfo: {
             CFBundleIconFile: "icon.icns",
           },
@@ -31,13 +36,6 @@ module.exports = defineConfig({
               target: "nsis",
             },
           ],
-        },
-        publish: {
-          provider: "github",
-          owner: "qianchuan0124",
-          repo: "record",
-          releaseType: "release",
-          publishAutoUpdate: true,
         },
         nsis: {
           oneClick: false, // 一键安装

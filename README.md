@@ -18,6 +18,16 @@ npm run electron:serve
 npm run electron:build
 ```
 
+## 内网分发（macOS）
+
+```bash
+npm run dist:mac
+```
+
+产出在 `dist_electron/release/`：ad-hoc 签名的 zip、带安装界面的 dmg、`首次打开.command`
+和安装说明。安装界面背景由 `packaging/dmg_background.py` 生成，布局在 `packaging/dmg_layout.py`。
+首次运行脚本会自动创建 `packaging/.venv` 并安装打包依赖（Pillow、ds_store、mac_alias）。
+
 ## 注意事项
 
 ### windows 下安装及打包
@@ -241,6 +251,17 @@ icon: path.join(app.getAppPath(), 'public/favicon.ico'),
 ```
 
 
+
+## iCloud 云端同步
+
+设置页的数据处理中新增「iCloud 同步」，用于把账本备份到 iCloud 云盘，换设备或重装后可从云端恢复。同步完全手动触发，不会自动上传或覆盖数据。
+
+- 应用不接入任何云服务 SDK，也不需要在应用内登录：系统登录 iCloud 云盘（macOS 上位于 `~/Library/Mobile Documents/com~apple~CloudDocs`，Windows 为 iCloudDrive）后，同步目录就是一个普通文件夹。
+- 点击「同步」后会弹出「选择要同步到的版本」：选择「本机当前数据」即把本机备份成一份新的云端版本；选择列表中的任一云端备份即用该版本覆盖本机数据（覆盖前自动备份本机数据库，并可一并恢复自定义分类）。
+- 备份写入 `iCloud 云盘/记账清单/`，文件名形如 `record_20261116_173800_ab12.db`，同时附一份自定义分类副本；`latest.json` 记录最新一份备份。
+- 正在使用的数据库不会直接放进同步目录，每次都写入一份 SQLite 一致性快照，避免多设备并发写和 iCloud 异步上传导致数据库损坏。
+- 每台设备默认保留最近 3 份快照，本机恢复前的数据库备份保留在 `userData/backups/` 中最近 5 份。
+- 未检测到 iCloud 云盘时，可点击「更改目录」手动选择 OneDrive、Dropbox 或其他同步目录。
 
 ## 更新
 

@@ -4,6 +4,7 @@ import { Record } from "@/models/Record";
 import { SingleYearlyData, TotalCategory, SingleCategoryData, YearlyData, TimeLineRecord, CategoryItem } from "@/models/AnalysisData"
 import { CategorySettingNode } from "@/models/CategorySettingNode"
 import { CategoryNodeItem } from '@/models/CategoryNodeItem'
+import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from '@/models/Payroll'
 
 export function logInfo(content: string) {
     window.electron.ipcRenderer.invoke('logger', 'info', ' [renderer] ' + content);
@@ -119,9 +120,9 @@ export async function asyncDeleteRecord(record: Record): Promise<void> {
 }
 
 // analysis Network
-export async function fetchYearlyData(years: string[]): Promise<SingleYearlyData[]> {
+export async function fetchYearlyData(years: string[], recordType: "支出" | "收入" = "支出"): Promise<SingleYearlyData[]> {
     try {
-        const result = await window.electron.ipcRenderer.invoke(IpcType.YEARLY_DATA, JSON.stringify(years));
+        const result = await window.electron.ipcRenderer.invoke(IpcType.YEARLY_DATA, JSON.stringify(years), recordType);
         const data = JSON.parse(result) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -170,9 +171,9 @@ export async function fetchCategoryData(category: string): Promise<SingleCategor
 }
 
 // 获取某年某个category的每月数据
-export async function fetchYearlyCategoryData(year: number, category: string): Promise<YearlyData> {
+export async function fetchYearlyCategoryData(year: number, category: string, recordType: "支出" | "收入" = "支出"): Promise<YearlyData> {
     try {
-        const result = await window.electron.ipcRenderer.invoke(IpcType.YEARLY_CATEGORY_DATA, year, category);
+        const result = await window.electron.ipcRenderer.invoke(IpcType.YEARLY_CATEGORY_DATA, year, category, recordType);
         const data = JSON.parse(result) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -187,9 +188,9 @@ export async function fetchYearlyCategoryData(year: number, category: string): P
 }
 
 // 获取某年所有的category数据
-export async function fetchYearlyTotalInfo(year: number): Promise<CategoryItem[]> {
+export async function fetchYearlyTotalInfo(year: number, recordType: "支出" | "收入" = "支出"): Promise<CategoryItem[]> {
     try {
-        const result = await window.electron.ipcRenderer.invoke(IpcType.YEARLY_TOTAL_CATEGORY, year);
+        const result = await window.electron.ipcRenderer.invoke(IpcType.YEARLY_TOTAL_CATEGORY, year, recordType);
         const data = JSON.parse(result) as IpcResponse;
         if (data.type === "error") {
             throw new Error(data.error);
@@ -324,6 +325,156 @@ export async function fetchCustomCategory(): Promise<CategoryNodeItem[]> {
     }
     catch (error: unknown) {
         logError("Fetching custom category failed:" + error);
+        throw error;
+    }
+}
+// Payroll Network
+
+export async function fetchPayrollData(): Promise<PayrollData> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.FETCH_PAYROLL_DATA);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        } else {
+            return data.data as PayrollData;
+        }
+    }
+    catch (error: unknown) {
+        logError("Fetching payroll data failed:" + error);
+        throw error;
+    }
+}
+
+export async function createSalary(salary: SalaryRecord): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.CREATE_SALARY, JSON.stringify(salary));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Creating salary failed:" + error);
+        throw error;
+    }
+}
+
+export async function updateSalary(salary: SalaryRecord): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.UPDATE_SALARY, JSON.stringify(salary));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Updating salary failed:" + error);
+        throw error;
+    }
+}
+
+export async function deleteSalary(id: number): Promise<void> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.DELETE_SALARY, id);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+    }
+    catch (error: unknown) {
+        logError("Deleting salary failed:" + error);
+        throw error;
+    }
+}
+
+export async function createBonus(bonus: AnnualBonus): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.CREATE_BONUS, JSON.stringify(bonus));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Creating bonus failed:" + error);
+        throw error;
+    }
+}
+
+export async function updateBonus(bonus: AnnualBonus): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.UPDATE_BONUS, JSON.stringify(bonus));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Updating bonus failed:" + error);
+        throw error;
+    }
+}
+
+export async function deleteBonus(id: number): Promise<void> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.DELETE_BONUS, id);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+    }
+    catch (error: unknown) {
+        logError("Deleting bonus failed:" + error);
+        throw error;
+    }
+}
+
+export async function saveBudgets(items: BudgetItem[]): Promise<BudgetItem[]> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.SAVE_BUDGETS, JSON.stringify(items));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as BudgetItem[];
+    }
+    catch (error: unknown) {
+        logError("Saving budgets failed:" + error);
+        throw error;
+    }
+}
+
+export async function fetchBudgetExpense(start: number, end: number): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.FETCH_BUDGET_EXPENSE, start, end);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Fetching budget expense failed:" + error);
+        throw error;
+    }
+}
+
+export async function importPayroll(payload: { salaries?: SalaryRecord[]; bonuses?: AnnualBonus[]; budgets?: BudgetItem[] }) {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.IMPORT_PAYROLL, JSON.stringify(payload));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data;
+    }
+    catch (error: unknown) {
+        logError("Importing payroll failed:" + error);
         throw error;
     }
 }

@@ -55,7 +55,7 @@
       :style="`width:${width};height:${controlHeight}`"
       v-model="selectedTime"
       type="date"
-      placeholder="Pick a day"
+      :placeholder="L10n.select_date"
       :clearable="false" />
   </div>
 </template>
@@ -179,9 +179,9 @@ const buttonWidth = ref("");
 const calculateDimensions = () => {
   // 自适应模式：由父级栅格决定宽度，控件填满可用空间
   if (props.customWidth === "auto") {
-    width.value = "calc(100% - 42px)";
     buttonWidth.value = "100%";
-    height.value = "32px";
+    width.value = "calc(100% - 32px)";
+    height.value = props.size === "large" ? "36px" : "30px";
     return;
   }
   switch (props.buttonType) {
@@ -354,10 +354,10 @@ function updateCategorys() {
 <style scoped>
 .button-title {
   font-size: 12px;
-  font-weight: 600;
-  color: #5a6274;
-  margin-right: 10px;
-  min-width: 30px;
+  font-weight: 400;
+  color: #9aa0ad;
+  margin-right: 6px;
+  min-width: 24px;
   text-align: left;
   white-space: nowrap;
   user-select: none !important;
@@ -372,7 +372,8 @@ function updateCategorys() {
   background-color: white;
   border: 1px solid #e3e5ea;
   border-radius: 8px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
   -webkit-app-region: drag;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -387,6 +388,10 @@ function updateCategorys() {
 }
 
 :deep(.el-input__prefix) {
+  display: none;
+}
+
+:deep(.el-date-editor .el-input__suffix) {
   display: none;
 }
 
@@ -434,7 +439,48 @@ input[type="number"] {
 }
 
 :deep(.el-input__inner) {
+  font-size: 13px;
   font-weight: 600;
+  color: #1b1f27;
+}
+
+:deep(.el-input__inner::placeholder) {
+  font-weight: 400;
+  color: #a4a9b6;
+}
+
+/* 窄窗口下标签换到控件上方，避免栅格列太窄把值截断 */
+@media (max-width: 1023px) {
+  .button-style {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 1px;
+    height: 48px;
+    padding: 3px 8px;
+  }
+
+  .button-style .button-title {
+    min-width: 0;
+    margin-right: 0;
+    font-size: 11px;
+    line-height: 1.2;
+    color: #9aa0ad;
+  }
+
+  .button-style :deep(.el-input),
+  .button-style :deep(.el-cascader),
+  .button-style :deep(.el-date-editor) {
+    width: 100% !important;
+    height: 26px !important;
+  }
+}
+
+:deep(.el-select__placeholder),
+:deep(.el-cascader__search-input) {
+  font-size: 13px;
+  font-weight: 400;
+  color: #a4a9b6;
 }
 </style>
 

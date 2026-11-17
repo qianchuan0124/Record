@@ -3,7 +3,21 @@
     <div v-if="isEmpty" class="empty-wrapper">
       <img class="empty-page" src="@/assets/empty_page.svg" />
     </div>
-    <div ref="myEchart" class="chart"></div>
+    <div class="chart-wrap">
+      <div ref="myEchart" class="chart"></div>
+      <div
+        v-if="totalIncome > 0 || totalOutcome > 0"
+        class="overview-footer">
+        <div v-if="totalOutcome > 0" class="overview-item">
+          <span class="overview-label">{{ L10n.all_expense }}</span>
+          <span class="overview-value expense">{{ formatAmount(totalOutcome) }}</span>
+        </div>
+        <div v-if="totalIncome > 0" class="overview-item">
+          <span class="overview-label">{{ L10n.all_income }}</span>
+          <span class="overview-value income">{{ formatAmount(totalIncome) }}</span>
+        </div>
+      </div>
+    </div>
     <div
       class="detail-mask"
       :class="{ 'is-open': detailVisible }"
@@ -82,6 +96,7 @@ import * as echarts from "echarts";
 import { generateCatgeoryNode, CategoryNode } from "./Manager";
 import {
   fetchTotalCategorysAmount,
+  fetchTotalAmount,
   logError,
   logInfo,
 } from "@/utils/DataCenter";
@@ -91,6 +106,12 @@ import { ElMessage } from "element-plus";
 const myEchart = ref<HTMLElement | null>(null);
 const myChart = ref<echarts.ECharts | null>(null);
 const isEmpty = ref(true);
+const totalIncome = ref(0);
+const totalOutcome = ref(0);
+
+function formatAmount(value: number): string {
+  return value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 // 详情树高度按容器实时高度计算，避免固定 550px 超出卡片被裁
 const detailPanel = ref<HTMLElement | null>(null);
 const treeHeight = ref(420);
@@ -109,7 +130,7 @@ function updateTreeHeight() {
   treeHeight.value = Math.max(180, el.clientHeight);
 }
 
-let chartObserver: IntersectionObserver | null = null;
+let chartObserver: ResizeObserver | null = null;
 let chartWidth = 0;
 let chartHeight = 0;
 
@@ -139,6 +160,10 @@ function setupChart(): boolean {
   window.addEventListener("resize", resizeChart);
   loadData();
   myChart.value.on("click", function (params) {
+    // 只有点击扇区才下钻，点击图例不打开详情，避免遮挡图形
+    if (params.componentType !== "series") {
+      return;
+    }
     logInfo("TotalData click" + params);
     reloadDetailValues(params.name);
   });
@@ -152,11 +177,8 @@ onMounted(() => {
     return;
   }
   setupChart();
-  // 首次显示时初始化，之后每次显示时按新尺寸重绘
-  chartObserver = new IntersectionObserver((entries) => {
-    if (!entries.some((entry) => entry.isIntersecting)) {
-      return;
-    }
+  // 页签隐藏时容器尺寸为 0，初始化会失败；用 ResizeObserver 在容器尺寸变化时补初始化/重绘
+  chartObserver = new ResizeObserver(() => {
     if (!myChart.value) {
       setupChart();
     } else {
@@ -210,8 +232,13 @@ async function reloadDetailValues(category: string) {
 
 async function loadData() {
   try {
-    const totalData = await fetchTotalCategorysAmount();
+    const [totalData, amount] = await Promise.all([
+      fetchTotalCategorysAmount(),
+      fetchTotalAmount(),
+    ]);
     isEmpty.value = totalData.length === 0;
+    totalIncome.value = amount.income;
+    totalOutcome.value = amount.outcome;
     const option = {
       color: [
         "#6c5dd3",
@@ -237,6 +264,7 @@ async function loadData() {
         top: 20,
         bottom: 20,
         data: totalData.map((item) => item.name),
+        selectedMode: false,
       },
       series: [
         {
@@ -282,7 +310,7 @@ const data = ref<CategoryNode[]>([]);
   display: flex;
   align-items: stretch;
   width: 100%;
-  height: calc(100vh - 200px);
+  height: 100%;
   min-height: 520px;
   padding: 8px 20px 12px 8px;
   overflow: hidden;
@@ -307,12 +335,54 @@ const data = ref<CategoryNode[]>([]);
   opacity: 0.9;
 }
 
+.chart-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .chart {
   flex: 1;
   min-width: 0;
-  height: 100%;
+  min-height: 0;
   margin-top: 8px;
   margin-left: 8px;
+}
+
+.overview-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  justify-content: center;
+  gap: 40px;
+  padding: 12px 0 6px;
+  border-top: 1px solid #f2f3f6;
+}
+
+.overview-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.overview-label {
+  font-size: 12px;
+  color: #6e7686;
+}
+
+.overview-value {
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-value.expense {
+  color: #e2434f;
+}
+
+.overview-value.income {
+  color: #18a472;
 }
 
 /* 点击图表项后在卡片右侧滑出详情，点击遮罩（旁边空白处）收回 */

@@ -6,7 +6,7 @@
         <el-col :span="2"></el-col>
         <el-col :span="3" class="record-title-item align-left">{{ L10n.category }}</el-col>
         <el-col :span="2"></el-col>
-        <el-col :span="3" class="record-title-item align-center">{{ L10n.type }}</el-col>
+        <el-col :span="3" class="record-title-item align-left">{{ L10n.type }}</el-col>
         <el-col :span="2"></el-col>
         <el-col :span="3" class="record-title-item align-right">{{ L10n.amount }}</el-col>
         <el-col :span="2"></el-col>
@@ -73,7 +73,7 @@
                     </div>
                   </el-col>
                   <el-col :span="2" class="record-item"></el-col>
-                  <el-col :span="3" class="record-item align-center">
+                  <el-col :span="3" class="record-item align-left">
                     <HightlightSpan
                       :content="record.type"
                       :keyword="currentFilter.keyword"></HightlightSpan>
@@ -94,73 +94,65 @@
                 <div
                   v-if="record.id === selectedRecord?.id"
                   class="select-record-container">
-                  <el-row class="select-record-cell">
-                    <!-- <el-col :span="2" class="select-record-item"></el-col> -->
-                    <el-col :span="16">
-                      <div class="top-input-elements">
-                        <CreateButton
-                          :ref="(el: CreateButtonType) => { if (el) categoryRefs = { button: el, recordId: record.id }; }"
-                          button-type="category"
-                          custom-width="auto"
-                          size="small"
-                          :content="selectedRecord.subCategory"></CreateButton>
-                        <CreateButton
-                          class="first-button"
-                          :ref="(el: CreateButtonType) => { if (el) typeRefs = { button: el, recordId: record.id }; }"
-                          button-type="type"
-                          custom-width="auto"
-                          size="small"
-                          :content="selectedRecord.type"></CreateButton>
-                        <CreateButton
-                          button-type="amount"
-                          :ref="(el: CreateButtonType) => { if (el) amountRefs = { button: el, recordId: record.id }; }"
-                          size="small"
-                          custom-width="auto"
-                          :content="
-                            selectedRecord.amount.toString()
-                          "></CreateButton>
-                      </div>
-                    </el-col>
-                    <el-col :span="1" class="select-record-item"></el-col>
-                    <el-col :span="7" class="select-record-action">
+                  <div class="select-record-form">
+                    <div class="edit-row">
+                      <CreateButton
+                        :ref="(el: CreateButtonType) => { if (el) categoryRefs = { button: el, recordId: record.id }; }"
+                        button-type="category"
+                        custom-width="auto"
+                        size="small"
+                        :content="selectedRecord.subCategory"></CreateButton>
+                      <CreateButton
+                        :ref="(el: CreateButtonType) => { if (el) typeRefs = { button: el, recordId: record.id }; }"
+                        button-type="type"
+                        custom-width="auto"
+                        size="small"
+                        :content="selectedRecord.type"></CreateButton>
+                      <CreateButton
+                        button-type="amount"
+                        :ref="(el: CreateButtonType) => { if (el) amountRefs = { button: el, recordId: record.id }; }"
+                        size="small"
+                        custom-width="auto"
+                        :content="selectedRecord.amount.toString()"></CreateButton>
+                    </div>
+                    <div class="edit-row">
+                      <CreateButton
+                        button-type="time"
+                        custom-width="auto"
+                        :ref="(el: CreateButtonType) => { if (el) timeRefs = { button: el, recordId: record.id }; }"
+                        size="small"
+                        :content="new Date(selectedRecord.date).toISOString()"></CreateButton>
+                      <CreateButton
+                        class="remark-field"
+                        button-type="remark"
+                        custom-width="auto"
+                        :ref="(el: CreateButtonType) => { if (el) remarkRefs = { button: el, recordId: record.id }; }"
+                        size="small"
+                        :content="selectedRecord.remark"></CreateButton>
+                    </div>
+                    <div class="budget-switch">
+                      <el-switch v-model="countInBudget" size="small" />
+                      <el-tooltip :content="L10n.count_in_budget_tip" placement="top">
+                        <span class="budget-switch-label">{{ L10n.count_in_budget }}</span>
+                      </el-tooltip>
+                    </div>
+                  </div>
+                  <div class="select-record-action">
+                    <div class="delete-action">
                       <AccountButton
                         button-type="delete"
                         :button-text="L10n.delete"
                         button-height="30px"
                         :click-handler="deleteConfirm"
-                        button-width="120px"></AccountButton>
-                    </el-col>
-                  </el-row>
-                  <el-row class="select-record-cell">
-                    <!-- <el-col :span="2" class="select-record-item"></el-col> -->
-                    <el-col :span="16">
-                      <div class="top-input-elements input-row-two">
-                        <CreateButton
-                          button-type="time"
-                          custom-width="auto"
-                          :ref="(el: CreateButtonType) => { if (el) timeRefs = { button: el, recordId: record.id }; }"
-                          size="small"
-                          :content="
-                            new Date(selectedRecord.date).toISOString()
-                          "></CreateButton>
-                        <CreateButton
-                          button-type="remark"
-                          custom-width="auto"
-                          :ref="(el: CreateButtonType) => { if (el) remarkRefs = { button: el, recordId: record.id }; }"
-                          size="small"
-                          :content="selectedRecord.remark"></CreateButton>
-                      </div>
-                    </el-col>
-                    <el-col :span="1" class="select-record-item"></el-col>
-                    <el-col :span="7" class="select-record-action">
-                      <AccountButton
-                        button-type="success"
-                        :button-text="L10n.save"
-                        button-height="30px"
-                        :click-handler="updateRecord"
-                        button-width="120px"></AccountButton>
-                    </el-col>
-                  </el-row>
+                        button-width="100%"></AccountButton>
+                    </div>
+                    <AccountButton
+                      button-type="success"
+                      :button-text="L10n.save"
+                      button-height="30px"
+                      :click-handler="updateRecord"
+                      button-width="100%"></AccountButton>
+                  </div>
                 </div>
               </li>
             </ul>
@@ -234,6 +226,7 @@ interface CreateButtonItem {
 const records = ref<DailyRecords[]>([]);
 const collapsedIds = ref<boolean[]>([]);
 const selectedRecord = ref<Record | null>(null);
+const countInBudget = ref<boolean>(true);
 
 const categoryRefs = ref<CreateButtonItem | null>(null);
 
@@ -268,6 +261,7 @@ function onTapCell(record: Record) {
     selectedRecord.value = null;
   } else {
     selectedRecord.value = record;
+    countInBudget.value = Number(record.countInBudget ?? 1) !== 0;
   }
 }
 
@@ -329,6 +323,7 @@ async function updateRecord() {
     remark: remark,
     isDeleted: false,
     syncId: 0,
+    countInBudget: countInBudget.value ? 1 : 0,
   };
 
   try {
@@ -352,7 +347,7 @@ async function updateRecord() {
 
 // 对外提供一个刷新数据的方法
 async function refreshData(filter: Filter) {
-  isLoaded.value = false;
+  // 刷新时保留现有列表，避免骨架屏一闪而过；只有首次加载才展示骨架
   try {
     const data = await fetchRecordsAndGroupByDate(filter);
     records.value = data;
@@ -432,7 +427,7 @@ onUnmounted(() => {
 
 <style scoped>
 .records-container {
-  height: calc(100vh - 336px);
+  height: 100%;
   /* overlay 滚动条不占布局宽度，列表卡片右边缘与上方卡片保持对齐 */
   overflow-y: overlay;
   user-select: none !important;
@@ -442,7 +437,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: calc(100vh - 430px);
+  height: calc(100% - 44px);
   min-height: 260px;
 }
 
@@ -499,7 +494,7 @@ ul {
   align-items: center;
   gap: 4px;
   color: #5a6274;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .left-daliy-icon {
@@ -520,14 +515,14 @@ ul {
 
 .right-daliy-income {
   margin-left: 6px;
-  font-weight: 700;
+  font-weight: 600;
   color: #18a472;
   font-variant-numeric: tabular-nums;
 }
 
 .right-daliy-expense {
   margin-left: 6px;
-  font-weight: 700;
+  font-weight: 600;
   color: #e2434f;
   font-variant-numeric: tabular-nums;
 }
@@ -542,7 +537,7 @@ ul {
   align-items: center;
   height: 40px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   color: #1b1f27;
   border-top: 1px solid #f2f3f6;
   cursor: pointer;
@@ -564,7 +559,7 @@ ul {
 }
 
 .record-item.align-right {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .record-item > div {
@@ -591,27 +586,68 @@ ul {
 }
 
 .select-record-container {
-  padding: 6px 0 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 148px;
+  gap: 16px;
+  padding: 10px 16px 12px;
   background-color: #fafafb;
   border-top: 1px solid #f2f3f6;
 }
 
-.select-record-cell {
+.select-record-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.edit-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.edit-row .remark-field {
+  grid-column: span 2;
+}
+
+.budget-switch {
   display: flex;
   align-items: center;
-  height: 52px;
+  gap: 8px;
+  padding-left: 2px;
+}
+
+.budget-switch-label {
+  font-size: 12px;
+  color: #5a6274;
+  cursor: default;
 }
 
 .select-record-action {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
-  height: 100%;
-  border-left: 1px solid #f2f3f6;
+  gap: 8px;
+  padding-left: 16px;
+  border-left: 1px solid #eef0f4;
 }
 
-.select-record-item {
-  height: 52px;
+.select-record-action :deep(.button) {
+  width: 100%;
+}
+
+.delete-action :deep(.button) {
+  background-color: white;
+  color: #e2434f;
+  border: 1px solid #f0c9ce;
+  box-shadow: none;
+}
+
+.delete-action :deep(.button:hover:not(:disabled)) {
+  background-color: #fff5f6;
+  filter: none;
 }
 
 .record-title {
@@ -623,7 +659,7 @@ ul {
   border: 1px solid #ebecf0;
   border-radius: 8px;
   font-size: 12px;
-  color: #5a6274;
+  color: #6e7686;
 }
 
 .record-title-item {
@@ -631,7 +667,7 @@ ul {
   align-items: center;
   height: 36px;
   padding: 0 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .record-category-item {
@@ -654,14 +690,4 @@ ul {
   text-overflow: ellipsis;
 }
 
-.top-input-elements {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 4px 12px;
-}
-
-.top-input-elements.input-row-two {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-}
 </style>

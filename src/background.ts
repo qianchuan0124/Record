@@ -9,6 +9,7 @@ import { databaseListen } from "./db/Database";
 import { logError, logInfo, logListener } from './utils/Log'
 import { autoUpdateApp } from './utils/AutoUpdater'
 import { settingListener } from './utils/SettingCenter'
+import { cloudSyncListeners } from './utils/CloudSync'
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
@@ -61,6 +62,9 @@ async function createWindow() {
         }
     })
 
+    // 云同步的 IPC 需要在页面加载前注册，否则设置页首次调用状态会拿不到 handler
+    cloudSyncListeners()
+
     if (process.env.WEBPACK_DEV_SERVER_URL) {
         // Load the url of the dev server if in development mode
         await win.loadURL(process.env.WEBPACK_DEV_SERVER_URL as string)
@@ -87,7 +91,10 @@ async function createWindow() {
         })
     }
 
-    autoUpdateApp(win)
+    // 内网分发包不走 GitHub 更新源，默认关闭检查；需要时用 RECORD_AUTO_UPDATE=1 启动。
+    if (process.env.RECORD_AUTO_UPDATE === '1') {
+        autoUpdateApp(win)
+    }
     settingListener(win)
 }
 

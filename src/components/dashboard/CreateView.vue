@@ -40,22 +40,21 @@
             size="large"></CreateButton>
           <CreateButton
             ref="remarkButton"
+            class="remark-field"
             button-type="remark"
             custom-width="auto"
             size="large"></CreateButton>
         </div>
       </div>
       <div class="right-action">
-        <div class="create-button">
-          <AccountButton
-            buttonWidth="168px"
-            buttonHeight="100%"
-            :button-text="L10n.create"
-            textFontSize="26px"
-            :clickHandler="createRecord"
-            :disabled="submitting"
-            button-type="primary"></AccountButton>
-        </div>
+        <button
+          class="create-primary"
+          type="button"
+          :disabled="submitting"
+          @click="createRecord">
+          <el-icon class="create-icon"><Plus /></el-icon>
+          <span>{{ L10n.create }}</span>
+        </button>
       </div>
     </div>
   </div>
@@ -63,7 +62,7 @@
 
 <script lang="ts" setup>
 import { ref, ComponentPublicInstance, onMounted, onDeactivated, onUnmounted } from "vue";
-import AccountButton from "@/components/utils/AccountButton.vue";
+import { Plus } from "@element-plus/icons-vue";
 import CreateButton from "@/components/utils/CreateButton.vue";
 import L10n from "@/configs/L10n.json";
 import { ElMessage } from "element-plus";
@@ -226,15 +225,32 @@ onDeactivated(() => {
 .total-container {
   display: flex;
   align-items: center;
-  flex: 0 0 auto;
+  flex: 0 0 264px;
+  min-width: 0;
   gap: 12px;
-  padding-right: 24px;
+  padding-right: 20px;
   border-right: 1px solid #ebecf0;
 }
 
+.total-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.total-item {
+  justify-content: space-between;
+}
+
+.income-span,
+.expend-span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .all-account-img {
-  width: 44px;
-  height: 60px;
+  width: 56px;
+  height: 76px;
   object-fit: contain;
 }
 
@@ -276,9 +292,9 @@ onDeactivated(() => {
   display: flex;
   align-items: center;
   flex: 1;
-  gap: 24px;
+  gap: 16px;
   min-width: 0;
-  padding-left: 24px;
+  padding-left: 20px;
 }
 
 .center-input {
@@ -289,18 +305,16 @@ onDeactivated(() => {
   min-width: 0;
 }
 
-.top-input {
+.top-input,
+.bottom-input {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: 1.3fr 0.9fr 0.8fr;
+  gap: 10px;
   width: 100%;
 }
 
-.bottom-input {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: 12px;
-  width: 100%;
+.remark-field {
+  grid-column: span 2;
 }
 
 .right-action {
@@ -308,10 +322,47 @@ onDeactivated(() => {
   align-items: stretch;
   align-self: stretch;
   flex: 0 0 auto;
-  padding-left: 8px;
+  padding-left: 4px;
 }
 
-.create-button {
+.create-primary {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 116px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #7a68e0 0%, #5a48c8 100%);
+  color: white;
+  font-family: inherit;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(108, 93, 211, 0.22);
+  transition: filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
 }
+
+.create-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 8px 18px rgba(108, 93, 211, 0.3);
+}
+
+.create-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.create-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.create-icon {
+  font-size: 26px;
+}
+
+
 </style>

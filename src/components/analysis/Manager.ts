@@ -19,9 +19,9 @@ export interface YearlyAnalysis {
 }
 
 // 根据传入的开始时间与结束时间，按照category生成年度分析数据
-export async function fetchYearlyAnalysis(yearsData: string[]): Promise<YearlyAnalysis[]> {
+export async function fetchYearlyAnalysis(yearsData: string[], recordType: "支出" | "收入" = "支出"): Promise<YearlyAnalysis[]> {
     try {
-        const data = await fetchYearlyData(yearsData);
+        const data = await fetchYearlyData(yearsData, recordType);
         const Category = getCategories();
         const categories = Category.map((item: any) => item.label);
         // 生成年度分析数据
@@ -100,9 +100,9 @@ function parseCategoryData(response: SingleCategoryData): CategoryNode {
     }
 }
 
-export async function generateYearlyCategoryNode(year: number, category: string): Promise<CategoryNode> {
+export async function generateYearlyCategoryNode(year: number, category: string, recordType: "支出" | "收入" = "支出"): Promise<CategoryNode> {
     try {
-        const data = await fetchYearlyCategoryData(year, category);
+        const data = await fetchYearlyCategoryData(year, category, recordType);
         return parseYearlyCategoryData(data);
     }
     catch (error: unknown) {
@@ -111,9 +111,9 @@ export async function generateYearlyCategoryNode(year: number, category: string)
     }
 }
 
-export async function generateYearlyTotalInfo(year: number): Promise<CategoryNode> {
+export async function generateYearlyTotalInfo(year: number, recordType: "支出" | "收入" = "支出"): Promise<CategoryNode> {
     try {
-        const data = await fetchYearlyTotalInfo(year);
+        const data = await fetchYearlyTotalInfo(year, recordType);
         return parseYearlyTotalData(year, data);
     }
     catch (error: unknown) {
@@ -184,6 +184,88 @@ export interface TimeLineNode {
     isLastest: boolean;
     type: "earliest" | "latest" | "largest",
     record: Record;
+}
+
+export type TimeLineEventType = "earliest" | "latest" | "largest" | "large" | "income";
+
+export interface TimeLineTag {
+    type: TimeLineEventType;
+    label: string;
+}
+
+export interface TimeLineEvent {
+    type: TimeLineEventType;
+    tags: TimeLineTag[];
+    record: Record;
+    isIncome: boolean;
+}
+
+export interface TimeLineYear {
+    year: number;
+    total: number;
+    incomeTotal: number;
+    totalRecords: number;
+    events: TimeLineEvent[];
+}
+
+// 组织每年的重点节点：最后一笔、金额最大的几笔支出、最大一笔收入、第一笔
+// 同一笔记录命中多个特征时合并为一张卡片，并整体按时间倒序排列
+function buildYearEvents(item: TimeLineRecord): TimeLineEvent[] {
+    const candidates: { type: TimeLineEventType; label: string; record?: Record | null }[] = [
+        { type: "latest", label: L10n.timeline_latest, record: item.latestRecord },
+        { type: "largest", label: L10n.timeline_largest, record: item.topExpenses?.[0] || item.largestAmountRecord },
+        { type: "large", label: L10n.timeline_large, record: item.topExpenses?.[1] },
+        { type: "large", label: L10n.timeline_large, record: item.topExpenses?.[2] },
+        { type: "income", label: L10n.timeline_income_largest, record: item.largestIncome },
+        { type: "earliest", label: L10n.timeline_first, record: item.earliestRecord },
+    ];
+
+    const merged = new Map<number, TimeLineEvent>();
+    for (const candidate of candidates) {
+        if (!candidate.record) {
+            continue;
+        }
+        const id = Number(candidate.record.id);
+        const existing = merged.get(id);
+        if (existing) {
+            existing.tags.push({ type: candidate.type, label: candidate.label });
+            continue;
+        }
+        merged.set(id, {
+            type: candidate.type,
+            tags: [{ type: candidate.type, label: candidate.label }],
+            record: candidate.record,
+            isIncome: candidate.record.type === "收入",
+        });
+    }
+
+    return Array.from(merged.values()).sort((a, b) => {
+        const dateDiff = new Date(b.record.date).getTime() - new Date(a.record.date).getTime();
+        if (dateDiff !== 0) {
+            return dateDiff;
+        }
+        return Number(b.record.amount) - Number(a.record.amount);
+    });
+}
+
+export async function generateTimeLineYears(): Promise<TimeLineYear[]> {
+    try {
+        const data = await fetchTimeLineData();
+        return data
+            .filter((item) => item && item.earliestRecord)
+            .sort((a, b) => b.year - a.year)
+            .map((item) => ({
+                year: item.year,
+                total: Number(item.total || 0),
+                incomeTotal: Number(item.incomeTotal || 0),
+                totalRecords: Number(item.totalRecords || 0),
+                events: buildYearEvents(item),
+            }));
+    }
+    catch (error) {
+        logError("Creating timeline failed:" + error);
+        return [];
+    }
 }
 
 export async function generateTimeLineNodes(): Promise<TimeLineNode[]> {

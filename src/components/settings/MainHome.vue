@@ -1,23 +1,54 @@
 <template>
   <div class="container">
-    <div class="inner-container">
-      <div class="container-top">
-        <button
-          class="feedback-trigger"
-          type="button"
-          @click="feedbackVisible = true">
-          {{ L10n.update_and_feedback }}
-        </button>
+    <div class="page">
+      <div class="page-header">
+        <div class="header-text">
+          <div class="page-title">{{ L10n.settings }}</div>
+          <div class="page-desc">{{ L10n.settings_desc }}</div>
+        </div>
+        <div class="header-actions">
+          <MobileDownload></MobileDownload>
+          <button
+            class="feedback-trigger"
+            type="button"
+            @click="feedbackVisible = true">
+            {{ L10n.update_and_feedback }}
+          </button>
+        </div>
       </div>
-      <div class="container-bottom">
-        <div class="container-left">
-          <div class="text-title">{{ L10n.data_handle }}</div>
-          <DataHandle></DataHandle>
+
+      <div class="settings-grid">
+        <div class="column-left">
+          <section class="settings-card">
+            <div class="card-head">
+              <span class="card-title">{{ L10n.data_handle }}</span>
+              <span class="card-desc">{{ L10n.data_handle_desc }}</span>
+            </div>
+            <div class="card-body">
+              <DataHandle></DataHandle>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="card-head">
+              <span class="card-title">{{ L10n.cloud_sync }}</span>
+              <span class="card-desc">{{ L10n.cloud_sync_desc }}</span>
+            </div>
+            <div class="card-body">
+              <CloudSync></CloudSync>
+            </div>
+          </section>
         </div>
-        <div class="container-right">
-          <div class="text-title">{{ L10n.custom_category }}</div>
-          <CategoryCustom></CategoryCustom>
-        </div>
+
+        <section class="settings-card category-card">
+          <div class="card-head">
+            <span class="card-title">{{ L10n.custom_category }}</span>
+            <span class="card-desc">{{ L10n.custom_category_desc }}</span>
+          </div>
+          <div class="card-body category-body">
+            <CategoryCustom></CategoryCustom>
+          </div>
+        </section>
       </div>
 
       <el-dialog
@@ -98,6 +129,8 @@
 import { ref, onMounted, onDeactivated } from "vue";
 import DataHandle from "./DataHandle.vue";
 import CategoryCustom from "./CategoryCustom.vue";
+import CloudSync from "./CloudSync.vue";
+import MobileDownload from "./MobileDownload.vue";
 import L10n from "@/configs/L10n.json";
 import packageInfo from "@/../package.json";
 import { ElMessage } from "element-plus";
@@ -200,23 +233,47 @@ onDeactivated(() => {
   overflow-y: auto;
 }
 
-.inner-container {
-  padding: 20px 24px 28px;
+.page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100%;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px 18px;
   background-color: white;
   border: 1px solid #ebecf0;
   border-radius: 12px;
   text-align: left;
-  font-size: 14px;
 }
 
-.container-top {
+.page-title {
+  font-size: 19px;
+  font-weight: 600;
+  color: #1b1f27;
+}
+
+.page-desc {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #9aa0ad;
+}
+
+.header-actions {
   display: flex;
-  justify-content: flex-end;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f2f3f6;
+  align-items: center;
+  gap: 8px;
+  flex: none;
 }
 
 .feedback-trigger {
+  flex: none;
   height: 30px;
   padding: 0 12px;
   background-color: white;
@@ -234,28 +291,70 @@ onDeactivated(() => {
   color: #6c5dd3;
 }
 
-.container-bottom {
+.settings-grid {
   display: flex;
-  gap: 48px;
-  min-height: 480px;
-  padding-top: 20px;
+  flex: 1;
+  gap: 16px;
+  align-items: stretch;
+  min-height: 0;
 }
 
-.container-left {
-  flex: 0 0 320px;
+.column-left {
+  display: flex;
+  flex: 0 0 380px;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
-.container-right {
+/* 让左栏最后一张卡片跟随页面高度，和右侧分类卡片底部对齐 */
+.column-left .settings-card:last-child {
+  flex: 1;
+}
+
+.category-card {
   flex: 1;
   min-width: 0;
+}
+
+.settings-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 15px 18px 16px;
+  background-color: white;
+  border: 1px solid #ebecf0;
+  border-radius: 12px;
   text-align: left;
 }
 
-.text-title {
-  padding: 0 0 16px;
+.card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.card-title {
   font-size: 15px;
   font-weight: 600;
   color: #1b1f27;
+}
+
+.card-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: #9aa0ad;
+}
+
+.card-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.category-body {
+  display: flex;
+  overflow: hidden;
 }
 
 .top-updater {

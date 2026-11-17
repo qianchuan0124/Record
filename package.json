@@ -16,7 +16,7 @@
     "electron:generate-icons": "electron-icon-builder --input=./public/favicon.png --output=build --flatten",
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps",
-    "publish:electron": "set NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service electron:build -p always"
+    "dist:mac": "bash scripts/dist-mac.sh"
   },
   "main": "background.js",
   "dependencies": {

@@ -95,6 +95,28 @@ const currentFilter = ref<Filter>({
 
 const emit = defineEmits(["filterChanged"]);
 
+function buildFilterSnapshot(): string {
+  return JSON.stringify({
+    types: currentFilter.value.types,
+    categorys: currentFilter.value.categorys,
+    keyword: currentFilter.value.keyword,
+    start: currentFilter.value.startTime.getTime(),
+    end: currentFilter.value.endTime.getTime(),
+  });
+}
+
+let lastFilterSnapshot = "";
+
+// 筛选条件没变化时不重复通知列表刷新，避免点开/关闭筛选框时内容闪一下
+function emitFilterChanged() {
+  const snapshot = buildFilterSnapshot();
+  if (snapshot === lastFilterSnapshot) {
+    return;
+  }
+  lastFilterSnapshot = snapshot;
+  emit("filterChanged", currentFilter.value);
+}
+
 function handleClickAll() {
   currentFilter.value.isAll = true;
   currentFilter.value.categorys = [];
@@ -106,7 +128,7 @@ function handleClickAll() {
   categoryFilter.value?.cleanValues();
   typeFilter.value?.cleanValues();
   remarkFilter.value?.cleanValues();
-  emit("filterChanged", currentFilter.value);
+  emitFilterChanged();
 }
 
 function handleCategoryUpdate(category: string[]) {
@@ -115,26 +137,26 @@ function handleCategoryUpdate(category: string[]) {
   });
   currentFilter.value.categorys = filterCategory;
   refreshInfos()
-  emit("filterChanged", currentFilter.value);
+  emitFilterChanged();
 }
 
 function handleTypeUpdate(type: string[]) {
   currentFilter.value.types = type.map((item) => {
     return findTypeLabelByValue(item[0]);
   });
-  emit("filterChanged", currentFilter.value);
+  emitFilterChanged();
 }
 
 function handleTimeUpdate(time: Date[]) {
   currentFilter.value.startTime = time[0];
   currentFilter.value.endTime = time[1];
   updateTime(time[0], time[1]);
-  emit("filterChanged", currentFilter.value);
+  emitFilterChanged();
 }
 
 function handleRemarkUpdate(remark: string) {
   currentFilter.value.keyword = remark;
-  emit("filterChanged", currentFilter.value);
+  emitFilterChanged();
 }
 
 async function updateDisplayValues(filter: string) {
@@ -238,6 +260,7 @@ function loadData() {
   currentDate.value = new Date();
   const [startTime, endTime] = getFirstAndLastDate(currentDate.value);
   updateTime(startTime, endTime);
+  lastFilterSnapshot = buildFilterSnapshot();
 }
 
 onMounted(() => {
@@ -277,7 +300,7 @@ onUnmounted(() => {
 
 .filter-title {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   color: #1b1f27;
   white-space: nowrap;
 }
@@ -291,7 +314,9 @@ onUnmounted(() => {
 .filter-summary {
   display: flex;
   align-items: baseline;
-  gap: 20px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 16px;
 }
 
 .summary-item {
@@ -308,7 +333,7 @@ onUnmounted(() => {
 
 .summary-value {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: #1b1f27;
 }
@@ -324,6 +349,7 @@ onUnmounted(() => {
 .summary-unit {
   font-size: 12px;
   color: #7e8697;
+  white-space: nowrap;
 }
 
 .filter-toolbar {

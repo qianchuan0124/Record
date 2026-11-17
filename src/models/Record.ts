@@ -8,6 +8,7 @@ export interface Record {
     remark: string;
     isDeleted: Boolean;
     syncId: number;
+    countInBudget?: number;
 }
 
 export interface DailyRecords {
