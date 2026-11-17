@@ -17,9 +17,9 @@ VERSION="$(node -p "require('./package.json').version")"
 RELEASE="dist_electron/release"
 
 # 分发包给 Apple Silicon：Node 可能跑在 Rosetta 下（process.arch=x64），
-# 按主机架构显式指定产物架构，避免在 Apple Silicon 上打出 x64 包。
+# 这时 uname -m 也会返回 x86_64，用 sysctl 判断硬件才是可靠的，避免打出 x64 包。
 BUILD_ARCH_ARG=""
-if [ "$(uname -m)" = "arm64" ]; then
+if [ "$(uname -m)" = "arm64" ] || [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = "1" ]; then
   BUILD_ARCH_ARG="--arm64"
 fi
 
@@ -53,7 +53,7 @@ case "$APP_ARCHS" in
   *x86_64*) ARCH_LABEL="x64" ;;
   *) ARCH_LABEL="unknown" ;;
 esac
-echo "构建产物：$APP（$ARCH_LABEL）"
+echo "构建产物：${APP}（${ARCH_LABEL}）"
 
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
