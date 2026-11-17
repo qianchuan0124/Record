@@ -1,5 +1,15 @@
 # 记账清单桌面版
 
+## 环境要求
+
+- macOS（Apple Silicon，arm64）
+- Node.js 18 LTS，且必须是 **arm64 原生版本**（不要用 Rosetta 下的 x64 Node）
+- 仓库根目录带 `.nvmrc`，`nvm use` 会自动切到 18
+
+```bash
+nvm install 18
+```
+
 ## 安装依赖
 
 ```bash
@@ -46,13 +56,15 @@ npm config set registry https://registry.npmmirror.com
 
 > Error: error:0308010C:digital envelope routines::unsupported
 
-**修复方案:**
+打包时插件内部的 webpack 4 会用 md4 做哈希，Node 18（OpenSSL 3）下需要开启 legacy provider。
+`npm run electron:build` 和 `npm run dist:mac` 会自动设置
+`NODE_OPTIONS=--openssl-legacy-provider`；开发模式 `npm run electron:serve` 不需要，
+也**不能**设置——Electron 13 内置的 Node 14 不认识这个参数，会让主进程直接退出。
+只有直接调用 `npx vue-cli-service electron:build` 时才需要自己 export：
 
 ```bash
 export NODE_OPTIONS=--openssl-legacy-provider
 ```
-
-注意这个不能在 serve 的时候开启，只能在 build 的时候开启
 
 > build 的时候 electron 下载失败
 

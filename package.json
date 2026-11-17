@@ -9,10 +9,13 @@
     "icon": "public/favicon.icns"
   },
   "private": true,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "lint": "vue-cli-service lint",
-    "electron:build": "set NODE_OPTIONS=--openssl-legacy-provider && vue-cli-service electron:build",
-    "electron:serve": "vue-cli-service electron:serve",
+    "electron:build": "bash scripts/electron-build.sh",
+    "electron:serve": "bash scripts/electron-serve.sh",
     "electron:generate-icons": "electron-icon-builder --input=./public/favicon.png --output=build --flatten",
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps",
