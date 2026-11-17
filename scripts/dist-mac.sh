@@ -19,9 +19,53 @@ RELEASE="dist_electron/release"
 # 分发包给 Apple Silicon：Node 可能跑在 Rosetta 下（process.arch=x64），
 # 这时 uname -m 也会返回 x86_64，用 sysctl 判断硬件才是可靠的，避免打出 x64 包。
 BUILD_ARCH_ARG=""
+TARGET_ARCH="x64"
 if [ "$(uname -m)" = "arm64" ] || [ "$(sysctl -n hw.optional.arm64 2>/dev/null || echo 0)" = "1" ]; then
   BUILD_ARCH_ARG="--arm64"
+  TARGET_ARCH="arm64"
 fi
+
+# sqlite3 是 N-API 原生模块，绑定文件必须和最终 .app 架构一致。
+# Rosetta 下 node_modules 里只有 npm install 时装的 x64 绑定，直接打包会导致
+# 启动时报 "Cannot find module ... napi-v6-darwin-unknown-arm64/node_sqlite3.node"。
+# 这里按目标架构补一份官方预编译绑定（npmmirror 优先，GitHub 兜底）。
+ensure_sqlite_binding() {
+  local arch="$1"
+  local lipo_arch="x86_64"
+  if [ "$arch" = "arm64" ]; then
+    lipo_arch="arm64"
+  fi
+
+  local binding_root="node_modules/sqlite3/lib/binding"
+  local dir="${binding_root}/napi-v6-darwin-unknown-${arch}"
+  local file="${dir}/node_sqlite3.node"
+  if [ -f "$file" ] && lipo -archs "$file" 2>/dev/null | grep -qw "$lipo_arch"; then
+    return
+  fi
+
+  local version
+  version="$(node -p "require('./node_modules/sqlite3/package.json').version")"
+  local name="napi-v6-darwin-unknown-${arch}.tar.gz"
+  local tmp
+  tmp="$(mktemp -d)"
+  echo "下载 sqlite3 ${arch} 预编译绑定（v${version}）..."
+  if ! curl -fsSL --retry 3 -o "${tmp}/${name}" \
+    "https://cdn.npmmirror.com/binaries/sqlite3/v${version}/${name}"; then
+    curl -fsSL --retry 3 -o "${tmp}/${name}" \
+      "https://github.com/TryGhost/node-sqlite3/releases/download/v${version}/${name}"
+  fi
+  rm -rf "$dir"
+  tar -xzf "${tmp}/${name}" -C "$binding_root"
+  rm -rf "$tmp"
+
+  if [ ! -f "$file" ] || ! lipo -archs "$file" 2>/dev/null | grep -qw "$lipo_arch"; then
+    echo "sqlite3 ${arch} 绑定准备失败：$file" >&2
+    exit 1
+  fi
+  echo "已准备 sqlite3 ${arch} 绑定"
+}
+
+ensure_sqlite_binding "$TARGET_ARCH"
 
 pkill -f "记账清单.app/Contents/MacOS/记账清单" 2>/dev/null || true
 
