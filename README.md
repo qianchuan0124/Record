@@ -34,9 +34,11 @@ npm run electron:build
 npm run dist:mac
 ```
 
-产出在 `dist_electron/release/`：ad-hoc 签名的 zip、带安装界面的 dmg、`首次打开.command`
-和安装说明。安装界面背景由 `packaging/dmg_background.py` 生成，布局在 `packaging/dmg_layout.py`。
+产出在 `dist_electron/release/`：`Record-<版本>-arm64.dmg` 和 `Record-安装说明.txt`。
+安装界面背景由 `packaging/dmg_background.py` 生成，布局在 `packaging/dmg_layout.py`，
+打包时直接写入 `.DS_Store`，不会再弹出 Finder 安装窗口。
 首次运行脚本会自动创建 `packaging/.venv` 并安装打包依赖（Pillow、ds_store、mac_alias）。
+Windows 安装包同样以 `Record-<版本>-<架构>.exe` 命名。
 
 ## 注意事项
 

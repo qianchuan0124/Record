@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 APP="${1:-dist_electron/mac-arm64/记账清单.app}"
 VERSION="$(node -p "require('./package.json').version")"
-OUT="${2:-dist_electron/release/记账清单-${VERSION}-arm64.dmg}"
+OUT="${2:-dist_electron/release/Record-${VERSION}-arm64.dmg}"
 VOLNAME="记账清单"
 APP_NAME="记账清单.app"
 PYTHON="${PYTHON:-packaging/.venv/bin/python}"
@@ -143,15 +143,16 @@ build_dmg_with_generated_layout() {
   hdiutil convert "$RAW_DIR/rw.dmg" -format UDZO -ov -o "$OUT" -quiet || return 1
 }
 
-if build_dmg_with_layout; then
+# 优先离线写入 .DS_Store，不调用 Finder，避免打包时弹出安装界面窗口
+if build_dmg_with_generated_layout; then
   echo "DMG 安装界面布局完成"
 else
-  echo "提示：Finder 排版不可用，改用预生成布局" >&2
+  echo "提示：离线布局不可用，改用 Finder 排版" >&2
   if [ -n "$MOUNT_POINT" ]; then
     hdiutil detach "$MOUNT_POINT" -quiet -force 2>/dev/null || true
     MOUNT_POINT=""
   fi
-  if ! build_dmg_with_generated_layout; then
+  if ! build_dmg_with_layout; then
     echo "警告：背景别名不可用，退回纯色背景布局" >&2
     "$PYTHON" packaging/dmg_layout.py "$STAGE" "$APP_NAME" || true
     hdiutil makehybrid -quiet -hfs -hfs-volume-name "$VOLNAME" \

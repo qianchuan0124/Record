@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 内网分发打包：ad-hoc 签名 + zip + 带安装界面的 dmg。
+# 内网分发打包：ad-hoc 签名 + 带安装界面的 dmg（不生成 zip）。
 # 环境要求：Apple Silicon + arm64 原生 Node 18 LTS（见 .nvmrc）。
 set -euo pipefail
 
@@ -61,6 +61,8 @@ ensure_sqlite_binding
 pkill -f "记账清单.app/Contents/MacOS/记账清单" 2>/dev/null || true
 
 rm -rf "$RELEASE"
+# 清掉历史产物，只保留本次发布包
+rm -rf dist_electron/*.dmg dist_electron/*.zip dist_electron/*.blockmap dist_electron/builder-debug.yml
 npx vue-cli-service electron:build --arm64
 
 if [ ! -d "$APP" ]; then
@@ -78,12 +80,12 @@ codesign --verify --deep --strict "$APP"
 echo "ad-hoc 签名完成"
 
 mkdir -p "$RELEASE"
-ditto -c -k --sequesterRsrc --keepParent "$APP" \
-  "$RELEASE/记账清单-${VERSION}-arm64.zip"
+bash packaging/make_dmg.sh "$APP" "$RELEASE/Record-${VERSION}-arm64.dmg"
+sed "s/__VERSION__/${VERSION}/g" packaging/安装说明.txt > "$RELEASE/Record-安装说明.txt"
 
-bash packaging/make_dmg.sh "$APP" "$RELEASE/记账清单-${VERSION}-arm64.dmg"
-
-sed "s/__VERSION__/${VERSION}/g" packaging/安装说明.txt > "$RELEASE/安装说明.txt"
+# 中间产物（未打包的 .app、webpack 输出）清理掉，只保留发布包
+rm -rf dist_electron/bundled dist_electron/mac-arm64 dist_electron/index.js \
+  dist_electron/package.json dist_electron/preload.js dist_electron/builder-debug.yml
 
 echo "内网分发包已生成："
 ls -lh "$RELEASE"

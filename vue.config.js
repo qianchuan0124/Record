@@ -22,6 +22,7 @@ module.exports = defineConfig({
       preload: "src/preload.js",
       builderOptions: {
         appId: "org.electron.record",
+        artifactName: "Record-${version}-${arch}.${ext}",
         // 原生模块（sqlite3 的 .node）不能从 asar 里 dlopen，必须解包
         asarUnpack: ["**/*.node"],
         mac: {
