@@ -22,12 +22,6 @@ npm install
 npm run electron:serve
 ```
 
-## 本地打包
-
-```bash
-npm run electron:build
-```
-
 ## 内网分发（macOS）
 
 ```bash
@@ -59,10 +53,10 @@ npm config set registry https://registry.npmmirror.com
 > Error: error:0308010C:digital envelope routines::unsupported
 
 打包时插件内部的 webpack 4 会用 md4 做哈希，Node 18（OpenSSL 3）下需要开启 legacy provider。
-`npm run electron:build` 和 `npm run dist:mac` 会自动设置
+`npm run dist:mac` 会自动设置
 `NODE_OPTIONS=--openssl-legacy-provider`；开发模式 `npm run electron:serve` 不需要，
 也**不能**设置——Electron 13 内置的 Node 14 不认识这个参数，会让主进程直接退出。
-只有直接调用 `npx vue-cli-service electron:build` 时才需要自己 export：
+只有直接调用 `npx vue-cli-service electron:build`（不推荐，见下面的 Python 说明）时才需要自己 export：
 
 ```bash
 export NODE_OPTIONS=--openssl-legacy-provider
@@ -78,15 +72,10 @@ https://www.cnblogs.com/xiaoniuzai/p/12356208.html
 
 > Error: Exit code: ENOENT. spawn /usr/bin/python ENOENT
 
-**修复方案:**
-
-1. npm install electron-builder@23.0.2
-2. 安装 python 2.7.18
-3. 将 python 路径指向安装的位置，如果用的是 pyenv 安装的，则是
-
-export PYTHON_PATH=/Users/{你的用户名}/.pyenv/shims/python
-
-4. 给予权限，sudo chmod 777 /Users/{你的用户名}/.pyenv/shims/python
+electron-builder 22 生成 dmg 时会直接调用 `/usr/bin/python` 跑内置的 dmgbuild，
+而 macOS 12.3 起系统不再自带 Python 2，所以直接用 electron-builder 打 dmg 就会报这个错。
+项目的 `npm run dist:mac` 不使用它的 dmg 目标：先只产 .app，再用项目自己的 Python 3 流程生成 dmg。
+不需要安装 Python 2.7，也不需要降级 / 升级 electron-builder。
 
 > pod install 很慢 或者直接卡主
 

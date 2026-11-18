@@ -14,7 +14,6 @@
   },
   "scripts": {
     "lint": "vue-cli-service lint",
-    "electron:build": "bash scripts/electron-build.sh",
     "electron:serve": "bash scripts/electron-serve.sh",
     "electron:generate-icons": "electron-icon-builder --input=./public/favicon.png --output=build --flatten",
     "postinstall": "electron-builder install-app-deps",
