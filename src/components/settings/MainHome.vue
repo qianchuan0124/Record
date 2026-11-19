@@ -230,14 +230,15 @@ onDeactivated(() => {
 .container {
   height: 100%;
   padding: 16px 24px 24px 16px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .page {
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .page-header {
@@ -305,23 +306,26 @@ onDeactivated(() => {
   flex-direction: column;
   gap: 16px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
-/* 让左栏最后一张卡片跟随页面高度，和右侧分类卡片底部对齐 */
-.column-left .settings-card:last-child {
+.column-left .settings-card:first-child {
   flex: 1;
+  min-height: 0;
 }
 
 .category-card {
   flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 
 .settings-card {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 15px 18px 16px;
+  padding: 10px 14px;
   background-color: white;
   border: 1px solid #ebecf0;
   border-radius: 12px;
@@ -331,8 +335,8 @@ onDeactivated(() => {
 .card-head {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
+  gap: 2px;
+  margin-bottom: 8px;
 }
 
 .card-title {

@@ -68,7 +68,8 @@ async function createWindow() {
   if (process.env.WEBPACK_DEV_SERVER_URL) {
     // Load the url of the dev server if in development mode
     await win.loadURL(process.env.WEBPACK_DEV_SERVER_URL as string)
-    if (!process.env.IS_TEST) win.webContents.openDevTools()
+    // 开发模式默认不自动打开 DevTools，需要时用 F12 / Cmd+Shift+I 手动打开
+    if (process.env.RECORD_DEVTOOLS === '1') win.webContents.openDevTools()
   } else {
     createProtocol('app')
     // Load the index.html when not in development

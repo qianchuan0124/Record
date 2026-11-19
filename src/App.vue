@@ -9,7 +9,7 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted } from "vue";
+import { onBeforeUnmount, onMounted } from "vue";
 import Home from "./components/MainHome.vue";
 import Color from "@/configs/Color.json";
 
@@ -17,7 +17,27 @@ import Color from "@/configs/Color.json";
 const root = document.documentElement;
 root.dataset.inputMode = "mouse";
 
+const scrollHideTimers = new Map<HTMLElement, number>();
+
+function markScrolling(event: Event) {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+  target.classList.add("is-scrolling");
+  const previous = scrollHideTimers.get(target);
+  if (previous) {
+    window.clearTimeout(previous);
+  }
+  const timer = window.setTimeout(() => {
+    target.classList.remove("is-scrolling");
+    scrollHideTimers.delete(target);
+  }, 700);
+  scrollHideTimers.set(target, timer);
+}
+
 onMounted(() => {
+  window.addEventListener("scroll", markScrolling, true);
   window.addEventListener(
     "pointerdown",
     () => {
@@ -34,6 +54,12 @@ onMounted(() => {
     },
     true
   );
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("scroll", markScrolling, true);
+  scrollHideTimers.forEach((timer) => window.clearTimeout(timer));
+  scrollHideTimers.clear();
 });
 </script>
 
@@ -108,11 +134,15 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #d3d6de;
+  background-color: transparent;
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: #d3d6de;
+}
+
+.is-scrolling::-webkit-scrollbar-thumb:hover {
   background-color: #bfc3ce;
 }
 

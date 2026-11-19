@@ -23,9 +23,9 @@
           @change="onYearEndChanged"
           :clearable="false" />
         <el-radio-group
-          v-if="showModeSwitch"
           v-model="recordMode"
           class="mode-switch"
+          :class="{ 'is-hidden': !showModeSwitch }"
           size="small"
           @change="onModeChanged">
           <el-radio-button value="expense">{{ L10n.expense }}</el-radio-button>
@@ -310,12 +310,7 @@ async function reloadData() {
         top: 10,
         selectedMode: false,
       },
-      grid: {
-        left: "15%",
-        right: "3%",
-        bottom: "3%",
-        containLabel: true,
-      },
+      grid: BASE_GRID,
       xAxis: [
         {
           type: "category",
@@ -358,14 +353,6 @@ async function reloadData() {
     };
     // 用 replaceMerge 整组替换 series：既清理已删除的分类，又保留已就绪的坐标系统，
     // 避免 notMerge 重建模型后 resize 时柱状图坐标系缺失导致 barPolar 报错
-    if (!baseReady && yearlyChart.value) {
-      baseReady = true;
-      yearlyChart.value.setOption({
-        xAxis: { type: "category", data: [] },
-        yAxis: { type: "value" },
-        series: [],
-      });
-    }
     yearlyChart.value?.setOption(option, { replaceMerge: ["series"] });
   } catch (error) {
     logError("reload yearly data failed " + error);
@@ -379,11 +366,17 @@ async function reloadData() {
 
 const yearlyChart = ref<echarts.ECharts | null>(null);
 let chartObserver: ResizeObserver | null = null;
-// 首次 setOption 会走 ECharts 的初始化分支（initBase），此后 resize 无法重建坐标系；
-// 先落一次空坐标系配置，让数据渲染走 merge 分支，保证 resize / 切回页签稳定
-let baseReady = false;
+let initTimer: number | null = null;
 let chartWidth = 0;
 let chartHeight = 0;
+
+// 空数据阶段也使用与正式数据完全一致的网格，避免首次渲染时横轴从默认宽度收缩
+const BASE_GRID = {
+  left: "15%",
+  right: "3%",
+  bottom: 64,
+  containLabel: false,
+};
 
 // 容器被隐藏时尺寸为 0，直接 resize 会让柱状图坐标系丢失，因此只在可见且尺寸变化时重绘
 function resizeChart() {
@@ -421,11 +414,14 @@ onDeactivated(() => {
 
 onUnmounted(() => {
   disableNotify();
+  if (initTimer) {
+    window.clearTimeout(initTimer);
+    initTimer = null;
+  }
   chartObserver?.disconnect();
   window.removeEventListener("resize", resizeChart);
   yearlyChart.value?.dispose();
   yearlyChart.value = null;
-  baseReady = false;
 });
 
 // 容器隐藏时宽高为 0，此时初始化 echarts 会导致柱状图坐标系缺失，需等待可见后再初始化
@@ -435,9 +431,15 @@ function setupChart(): boolean {
     return false;
   }
   yearlyChart.value = echarts.init(el);
-  baseReady = false;
   chartWidth = el.clientWidth;
   chartHeight = el.clientHeight;
+  // 先落一次带最终网格的空坐标系，后续数据走 merge 分支，横轴线从第一帧起就是最终长度
+  yearlyChart.value.setOption({
+    grid: BASE_GRID,
+    xAxis: { type: "category", data: [] },
+    yAxis: { type: "value" },
+    series: [],
+  });
   window.addEventListener("resize", resizeChart);
   reloadData();
   yearlyChart.value.on("click", function (params) {
@@ -455,16 +457,29 @@ function setupChart(): boolean {
   return true;
 }
 
+function setupChartWithRetry(attempt = 0) {
+  if (yearlyChart.value) {
+    return;
+  }
+  if (setupChart()) {
+    return;
+  }
+  // 首次进入页签时容器可能还没完成布局，短暂重试，避免坐标系在错误尺寸下初始化
+  if (attempt < 20) {
+    initTimer = window.setTimeout(() => setupChartWithRetry(attempt + 1), 50);
+  }
+}
+
 onMounted(() => {
   const el = myEchart.value;
   if (!el) {
     return;
   }
-  setupChart();
+  setupChartWithRetry();
   // 页签隐藏时容器尺寸为 0，初始化会失败；用 ResizeObserver 在容器尺寸变化时补初始化/重绘
   chartObserver = new ResizeObserver(() => {
     if (!yearlyChart.value) {
-      setupChart();
+      setupChartWithRetry();
     } else {
       resizeChart();
     }
@@ -561,6 +576,12 @@ const data = ref<CategoryNode[]>([]);
   margin-left: 4px;
 }
 
+/* 首屏提前占位，避免合计数据到达后模式切换出现导致图表高度跳动 */
+.mode-switch.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .mode-switch :deep(.el-radio-button__inner) {
   height: 24px;
   padding: 0 12px;
@@ -649,6 +670,11 @@ const data = ref<CategoryNode[]>([]);
 .detail-container {
   flex: 1;
   min-height: 0;
+}
+
+/* 虚拟列表的滚动条是覆盖式，给每行右侧留出空间，避免盖住金额文字 */
+.detail-container :deep(.el-tree-node__content) {
+  padding-right: 18px;
 }
 
 .detail-title {

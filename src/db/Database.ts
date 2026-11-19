@@ -4,6 +4,8 @@ import { ipcMain } from "electron";
 import { app } from 'electron';
 import { Record } from "@/models/Record";
 import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from "@/models/Payroll";
+import { DepositBank, DepositData, DepositRecord } from "@/models/Deposit";
+import { presetByName } from "@/configs/BankPresets";
 import { calcSalaryTax } from "@/utils/PayrollTax";
 import { IpcResponse, IpcType } from "@/models/IpcResponse";
 import fs from "fs/promises";
@@ -63,6 +65,28 @@ CREATE TABLE IF NOT EXISTS budget_item (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     amount REAL NOT NULL DEFAULT 0,
+    isDeleted BOOLEAN DEFAULT 0,
+    syncId INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS deposit_bank (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT '',
+    isDeleted BOOLEAN DEFAULT 0,
+    syncId INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS deposit_record (
+    id INTEGER PRIMARY KEY,
+    bankId INTEGER NOT NULL DEFAULT 0,
+    bankKey TEXT DEFAULT '',
+    startDate INTEGER NOT NULL,
+    amount REAL NOT NULL DEFAULT 0,
+    years REAL NOT NULL DEFAULT 0,
+    rate REAL NOT NULL DEFAULT 0,
+    interest REAL NOT NULL DEFAULT 0,
+    sortOrder INTEGER DEFAULT 0,
     isDeleted BOOLEAN DEFAULT 0,
     syncId INTEGER DEFAULT 0
 );
@@ -148,63 +172,88 @@ export async function reopenDatabase(): Promise<void> {
     await openDatabase();
 }
 
-function upgrateDatabase(): Promise<void> {
+function execSql(sql: string): Promise<void> {
     return new Promise((resolve) => {
-        const upgradeRecordColumns = () => {
-            db.all("PRAGMA table_info(record);", (err, rows: any[]) => {
-                if (err) {
-                    logError("Check columns failed, error:" + err.message);
-                    resolve();
-                    return;
-                }
-                const hasSyncId = rows.some(row => row.name === "syncId");
-                const hasCountInBudget = rows.some(row => row.name === "countInBudget");
-                const statements: string[] = [];
-                if (!hasSyncId) {
-                    statements.push("ALTER TABLE record ADD COLUMN syncId INTEGER DEFAULT 0;");
-                }
-                if (!hasCountInBudget) {
-                    statements.push("ALTER TABLE record ADD COLUMN countInBudget BOOLEAN DEFAULT 1;");
-                }
-                if (statements.length === 0) {
-                    resolve();
-                    return;
-                }
-                db.exec(statements.join("\n"), (alterErr) => {
-                    if (alterErr) {
-                        logError("Upgrade record table failed, error:" + alterErr.message);
-                    } else {
-                        logInfo("Record table columns upgraded.");
-                    }
-                    resolve();
-                });
-            });
-        };
-
-        db.exec(createPayrollTableSql, (tableErr) => {
-            if (tableErr) {
-                logError("Create payroll tables failed, error:" + tableErr.message);
+        db.exec(sql, (err) => {
+            if (err) {
+                logError("exec sql failed: " + err.message);
             }
-            db.all("PRAGMA table_info(salary_record);", (salaryErr, salaryRows: any[]) => {
-                if (salaryErr) {
-                    logError("Check salary columns failed, error:" + salaryErr.message);
-                    upgradeRecordColumns();
-                    return;
-                }
-                if (salaryRows.some((row) => row.name === "taxManual")) {
-                    upgradeRecordColumns();
-                    return;
-                }
-                db.run("ALTER TABLE salary_record ADD COLUMN taxManual BOOLEAN DEFAULT 0;", (alterErr) => {
-                    if (alterErr) {
-                        logError("Add salary taxManual failed, error:" + alterErr.message);
-                    } else {
-                        logInfo("Salary table column taxManual added.");
-                    }
-                    upgradeRecordColumns();
-                });
-            });
+            resolve();
         });
+    });
+}
+
+async function ensureColumn(table: string, column: string, definition: string): Promise<void> {
+    const rows = await dbAll(`PRAGMA table_info(${table});`, []) as { name: string }[];
+    if (rows.some((row) => row.name === column)) {
+        return;
+    }
+    await new Promise<void>((resolve) => {
+        db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`, (err) => {
+            if (err) {
+                logError(`Add ${table}.${column} failed: ` + err.message);
+            } else {
+                logInfo(`${table}.${column} added.`);
+            }
+            resolve();
+        });
+    });
+}
+
+async function migrateDepositBankKeys(): Promise<void> {
+    await ensureColumn("deposit_record", "bankKey", "TEXT DEFAULT ''");
+    await ensureColumn("deposit_record", "amount", "REAL NOT NULL DEFAULT 0");
+    // 历史数据没有本金时，用 利息 / (利率 × 年限) 反推本金
+    await new Promise<void>((resolve) => {
+        db.run(
+            `UPDATE deposit_record
+             SET amount = ROUND(interest / (rate / 100.0 * years), 2)
+             WHERE amount = 0 AND interest > 0 AND rate > 0 AND years > 0`,
+            () => resolve()
+        );
+    });
+    const rows = await dbAll(
+        `SELECT d.id AS id, d.bankId AS bankId, IFNULL(b.name, '') AS name
+         FROM deposit_record d LEFT JOIN deposit_bank b ON b.id = d.bankId
+         WHERE IFNULL(d.bankKey, '') = ''`,
+        []
+    ) as { id: number; bankId: number; name: string }[];
+    for (const row of rows) {
+        const preset = presetByName(row.name);
+        const key = preset ? `b:${preset.icon}` : (row.bankId ? `c:${row.bankId}` : "");
+        await new Promise<void>((resolve) => {
+            db.run("UPDATE deposit_record SET bankKey = ? WHERE id = ?", [key, row.id], () => resolve());
+        });
+    }
+
+    // 内置银行信息保存在安装包内，不再作为同步数据保留
+    const banks = await dbAll("SELECT id, name FROM deposit_bank WHERE isDeleted = 0", []) as { id: number; name: string }[];
+    for (const bank of banks) {
+        if (!presetByName(bank.name)) {
+            continue;
+        }
+        const used = await dbGet(
+            "SELECT COUNT(*) AS total FROM deposit_record WHERE isDeleted = 0 AND bankKey = ?",
+            [`c:${bank.id}`]
+        ) as { total: number };
+        if (Number((used as { total: number }).total) === 0) {
+            await new Promise<void>((resolve) => {
+                // 内置银行不落库、不参与同步，迁移时直接移除历史记录
+                db.run("DELETE FROM deposit_bank WHERE id = ?", [bank.id], () => resolve());
+            });
+        }
+    }
+}
+
+function upgrateDatabase(): Promise<void> {
+    return (async () => {
+        await execSql(createPayrollTableSql);
+        await ensureColumn("salary_record", "taxManual", "BOOLEAN DEFAULT 0");
+        await ensureColumn("record", "syncId", "INTEGER DEFAULT 0");
+        await ensureColumn("record", "countInBudget", "BOOLEAN DEFAULT 1");
+        await migrateDepositBankKeys();
+    })().catch((error) => {
+        logError("upgrade database failed: " + error);
     });
 }
 
@@ -532,6 +581,78 @@ export function databaseListen() {
             return handleResult(await fetchBudgetExpense(Number(start), Number(end)));
         } catch (error: unknown) {
             logError("Fetching budget expense failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.FETCH_DEPOSIT_DATA, async () => {
+        try {
+            return handleResult(await fetchDepositData());
+        } catch (error: unknown) {
+            logError("Fetching deposit data failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.CREATE_BANK, async (event, bank) => {
+        try {
+            return handleResult(await createBank(JSON.parse(bank) as DepositBank));
+        } catch (error: unknown) {
+            logError("Creating bank failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.UPDATE_BANK, async (event, bank) => {
+        try {
+            return handleResult(await updateBank(JSON.parse(bank) as DepositBank));
+        } catch (error: unknown) {
+            logError("Updating bank failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.DELETE_BANK, async (event, id) => {
+        try {
+            return handleResult(await deleteBank(Number(id)));
+        } catch (error: unknown) {
+            logError("Deleting bank failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.CREATE_DEPOSIT, async (event, deposit) => {
+        try {
+            return handleResult(await createDeposit(JSON.parse(deposit) as DepositRecord));
+        } catch (error: unknown) {
+            logError("Creating deposit failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.UPDATE_DEPOSIT, async (event, deposit) => {
+        try {
+            return handleResult(await updateDeposit(JSON.parse(deposit) as DepositRecord));
+        } catch (error: unknown) {
+            logError("Updating deposit failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.DELETE_DEPOSIT, async (event, id) => {
+        try {
+            return handleResult(await deleteDeposit(Number(id)));
+        } catch (error: unknown) {
+            logError("Deleting deposit failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.REORDER_DEPOSITS, async (event, ids) => {
+        try {
+            return handleResult(await reorderDeposits(JSON.parse(ids) as number[]));
+        } catch (error: unknown) {
+            logError("Reordering deposits failed:" + error);
             return handleError(error);
         }
     })
@@ -1150,6 +1271,169 @@ async function readCustomCategory(): Promise<string> {
             throw new Error(ErrorType.FILE_READ_FAIL); // 抛出异常供调用者处理
         }
     }
+}
+
+// ---------- 存款 ----------
+
+async function fetchDepositData(): Promise<DepositData> {
+    const banks = await dbAll(
+        "SELECT * FROM deposit_bank WHERE isDeleted = 0 ORDER BY id ASC",
+        []
+    ) as DepositBank[];
+    const deposits = await dbAll(
+        "SELECT * FROM deposit_record WHERE isDeleted = 0 ORDER BY sortOrder ASC, startDate ASC, id ASC",
+        []
+    ) as DepositRecord[];
+    return { banks, deposits };
+}
+
+async function createBank(bank: DepositBank): Promise<number> {
+    const name = String(bank.name || "").trim();
+    if (!name) {
+        throw new Error("银行名称不能为空");
+    }
+    const row = await new Promise<number>((resolve, reject) => {
+        db.run(
+            "INSERT INTO deposit_bank (name, icon) VALUES (?, ?)",
+            [name, String(bank.icon || "")],
+            function (err) {
+                if (err) {
+                    reject(new Error(ErrorType.DATA_BASE_ERROR));
+                } else {
+                    resolve(this.lastID);
+                }
+            }
+        );
+    });
+    return row;
+}
+
+async function updateBank(bank: DepositBank): Promise<number> {
+    if (!bank.id) {
+        throw new Error(ErrorType.RECORD_NOT_EXIST);
+    }
+    const name = String(bank.name || "").trim();
+    if (!name) {
+        throw new Error("银行名称不能为空");
+    }
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            "UPDATE deposit_bank SET name = ?, icon = ?, syncId = syncId + 1 WHERE id = ? AND isDeleted = 0",
+            [name, String(bank.icon || ""), bank.id],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return bank.id;
+}
+
+async function deleteBank(id: number): Promise<number> {
+    const used = await dbGet(
+        "SELECT COUNT(*) AS total FROM deposit_record WHERE bankKey = ? AND isDeleted = 0",
+        [`c:${id}`]
+    ) as { total: number };
+    if (Number((used as { total: number }).total) > 0) {
+        throw new Error("该银行还有存款记录，请先删除存款");
+    }
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            "UPDATE deposit_bank SET isDeleted = 1, syncId = syncId + 1 WHERE id = ?",
+            [id],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return id;
+}
+
+async function createDeposit(deposit: DepositRecord): Promise<number> {
+    if (!deposit.bankKey) {
+        throw new Error("请选择银行");
+    }
+    if (!deposit.startDate) {
+        throw new Error(ErrorType.DATE_NOT_EMPTY);
+    }
+    const maxOrder = await dbGet(
+        "SELECT IFNULL(MAX(sortOrder), 0) AS maxOrder FROM deposit_record WHERE isDeleted = 0",
+        []
+    ) as { maxOrder: number };
+    const hasCustomOrder = Number((maxOrder as { maxOrder: number }).maxOrder) > 0;
+    const sortOrder = hasCustomOrder
+        ? Number((maxOrder as { maxOrder: number }).maxOrder) + 1
+        : 0;
+    const row = await new Promise<number>((resolve, reject) => {
+        db.run(
+            `INSERT INTO deposit_record (bankId, bankKey, startDate, amount, years, rate, interest, sortOrder)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                0,
+                deposit.bankKey,
+                dayStart(deposit.startDate),
+                round2(deposit.amount),
+                Number(deposit.years) || 0,
+                round2(deposit.rate),
+                round2(deposit.interest),
+                sortOrder,
+            ],
+            function (err) {
+                if (err) {
+                    reject(new Error(ErrorType.DATA_BASE_ERROR));
+                } else {
+                    resolve(this.lastID);
+                }
+            }
+        );
+    });
+    return row;
+}
+
+async function updateDeposit(deposit: DepositRecord): Promise<number> {
+    if (!deposit.id) {
+        throw new Error(ErrorType.RECORD_NOT_EXIST);
+    }
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            `UPDATE deposit_record SET bankId = 0, bankKey = ?, startDate = ?, amount = ?, years = ?, rate = ?, interest = ?,
+             syncId = syncId + 1 WHERE id = ? AND isDeleted = 0`,
+            [
+                deposit.bankKey,
+                dayStart(deposit.startDate),
+                round2(deposit.amount),
+                Number(deposit.years) || 0,
+                round2(deposit.rate),
+                round2(deposit.interest),
+                deposit.id,
+            ],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return deposit.id;
+}
+
+async function deleteDeposit(id: number): Promise<number> {
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            "UPDATE deposit_record SET isDeleted = 1, syncId = syncId + 1 WHERE id = ?",
+            [id],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return id;
+}
+
+async function reorderDeposits(ids: number[]): Promise<number[]> {
+    for (let index = 0; index < ids.length; index += 1) {
+        const id = Number(ids[index]);
+        if (!id) {
+            continue;
+        }
+        await new Promise<void>((resolve, reject) => {
+            db.run(
+                "UPDATE deposit_record SET sortOrder = ?, syncId = syncId + 1 WHERE id = ? AND isDeleted = 0",
+                [index + 1, id],
+                (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+            );
+        });
+    }
+    return ids;
 }
 
 // ---------- 薪酬 ----------

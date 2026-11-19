@@ -24,8 +24,10 @@
         height="100%"
         :empty-text="L10n.payroll_empty"
         class="payroll-table">
-        <el-table-column :label="L10n.date_label" :width="columnWidths.date" align="center">
-          <template #default="{ row }">{{ formatDateByDot(new Date(row.date)) }}</template>
+        <el-table-column :label="L10n.date_label" :width="columnWidths.date" align="right">
+          <template #default="{ row }">
+            <span class="date-cell">{{ formatDateByDot(new Date(row.date)) }}</span>
+          </template>
         </el-table-column>
         <el-table-column :label="L10n.record_type" :width="columnWidths.type" align="center">
           <template #default="{ row }">
@@ -54,7 +56,7 @@
         </el-table-column>
         <el-table-column :label="L10n.social_insurance" :width="columnWidths.insurance" align="right">
           <template #default="{ row }">
-            <span v-if="row.kind === 'salary'">{{ money(row.socialInsurance) }}</span>
+            <span v-if="row.kind === 'salary'" class="money-negative">{{ money(row.socialInsurance) }}</span>
             <span v-else class="placeholder">—</span>
           </template>
         </el-table-column>
@@ -65,14 +67,20 @@
           </template>
         </el-table-column>
         <el-table-column :label="L10n.tax" :width="columnWidths.tax" align="right">
-          <template #default="{ row }">{{ money(row.tax) }}</template>
+          <template #default="{ row }"><span class="money-negative">{{ money(row.tax) }}</span></template>
         </el-table-column>
         <el-table-column :label="L10n.tax_rate" :width="columnWidths.rate" align="right">
-          <template #default="{ row }">{{ percent(row.taxRate) }}</template>
+          <template #default="{ row }">
+            <span class="tax-rate" :class="taxRateClass(row.taxRate)">{{ percent(row.taxRate) }}</span>
+          </template>
         </el-table-column>
         <el-table-column :label="L10n.net_pay" :width="columnWidths.net" align="right">
           <template #default="{ row }"><span class="net-pay">{{ money(row.netPay) }}</span></template>
         </el-table-column>
+        <el-table-column
+          width="12"
+          class-name="operation-spacer"
+          label-class-name="operation-spacer" />
         <el-table-column
           :label="L10n.operation"
           :width="columnWidths.operation"
@@ -217,12 +225,14 @@ const BASE_COLUMN_WIDTHS = {
   rate: 96,
   net: 112,
 };
-const OPERATION_WIDTH = 128;
+const OPERATION_WIDTH = 112;
+const OPERATION_SPACER = 12;
+const OPERATION_RESERVED = OPERATION_WIDTH + OPERATION_SPACER;
 
 function computeColumnWidths(available: number) {
   const keys = Object.keys(BASE_COLUMN_WIDTHS) as (keyof typeof BASE_COLUMN_WIDTHS)[];
   const baseSum = keys.reduce((sum, key) => sum + BASE_COLUMN_WIDTHS[key], 0);
-  const extra = Math.max(0, available - baseSum - OPERATION_WIDTH);
+  const extra = Math.max(0, available - baseSum - OPERATION_RESERVED);
   const per = Math.floor(extra / keys.length);
   const next = { ...BASE_COLUMN_WIDTHS, operation: OPERATION_WIDTH } as {
     date: number; type: number; base: number; overtime: number; oneTime: number;
@@ -231,7 +241,7 @@ function computeColumnWidths(available: number) {
   keys.forEach((key) => {
     next[key] = BASE_COLUMN_WIDTHS[key] + per;
   });
-  const used = keys.reduce((sum, key) => sum + next[key], 0) + OPERATION_WIDTH;
+  const used = keys.reduce((sum, key) => sum + next[key], 0) + OPERATION_RESERVED;
   next.net += available - used;
   return next;
 }
@@ -349,6 +359,17 @@ function percent(value?: number): string {
   return `${Number(value || 0).toFixed(2)}%`;
 }
 
+function taxRateClass(value?: number): string {
+  const rate = Number(value || 0);
+  if (rate <= 10) {
+    return "rate-low";
+  }
+  if (rate < 30) {
+    return "rate-mid";
+  }
+  return "rate-high";
+}
+
 async function loadExpense() {
   const [start, end] = getFirstAndLastDate(new Date());
   const expense = await fetchBudgetExpense(start.getTime(), end.getTime());
@@ -424,6 +445,7 @@ async function removeRow(row: PayrollRow) {
     }
     await reloadAll();
     notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
+    ElMessage.success(isSalary ? L10n.salary_deleted : L10n.bonus_deleted);
   } catch (error) {
     if (error !== "cancel" && error !== "close" && error instanceof Error) {
       ElMessage.error(error.message);
@@ -561,7 +583,7 @@ onActivated(() => {
 }
 
 .tax {
-  color: #b26a00;
+  color: #e2434f;
 }
 
 .table-card {
@@ -611,7 +633,40 @@ onActivated(() => {
 
 .payroll-table {
   width: 100%;
+  font-size: 13px;
+  --el-table-border-color: #f0f1f5;
+  --el-table-row-hover-bg-color: #fafafe;
+}
+
+.payroll-table :deep(th.el-table__cell) {
+  height: 38px;
+  padding: 0;
+  background-color: #ffffff;
+  border-bottom: 1px solid #f0f1f5;
   font-size: 12px;
+  font-weight: 400;
+  color: #5a6274;
+}
+
+.payroll-table :deep(td.el-table__cell) {
+  height: 54px;
+  padding: 0;
+  border-bottom: 1px solid #f7f8fa;
+  color: #1b1f27;
+  font-variant-numeric: tabular-nums;
+}
+
+.payroll-table :deep(.cell) {
+  padding: 0 10px;
+  line-height: 54px;
+}
+
+.payroll-table :deep(th.el-table__cell .cell) {
+  line-height: 38px;
+}
+
+.payroll-table :deep(.el-table__body tr:hover > td.el-table__cell) {
+  background-color: #fafafe;
 }
 
 /*
@@ -658,7 +713,28 @@ onActivated(() => {
 }
 
 .payroll-table :deep(th.operation-column) {
-  color: #8a90a2;
+  background-color: #fafafc;
+}
+
+.payroll-table :deep(.operation-spacer) {
+  background-color: #ffffff;
+  border-left: 0;
+}
+
+.payroll-table :deep(.el-table__body tr:hover > td.operation-column) {
+  background-color: #fafafc;
+}
+
+.payroll-table :deep(th.operation-column) {
+  color: #5a6274;
+}
+
+.payroll-table :deep(td.operation-column .cell) {
+  padding-right: 10px;
+}
+
+.payroll-table :deep(.operation-actions) {
+  justify-content: center;
 }
 
 .operation-actions {
@@ -674,9 +750,33 @@ onActivated(() => {
   background-color: #e3e5ea;
 }
 
+.date-cell {
+  color: #5a6274;
+}
+
+.money-negative {
+  color: #e2434f;
+}
+
 .net-pay {
   font-weight: 600;
-  color: #1b1f27;
+  color: #18a472;
+}
+
+.tax-rate {
+  font-weight: 600;
+}
+
+.tax-rate.rate-low {
+  color: #18a472;
+}
+
+.tax-rate.rate-mid {
+  color: #b26a00;
+}
+
+.tax-rate.rate-high {
+  color: #e2434f;
 }
 
 .payroll-bottom {

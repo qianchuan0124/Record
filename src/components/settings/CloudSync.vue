@@ -32,6 +32,28 @@
       </div>
     </div>
 
+    <div class="auto-settings" v-if="status && status.available">
+      <el-tooltip :content="L10n.auto_backup_tip" placement="top">
+        <div class="auto-item">
+          <span class="auto-title">{{ L10n.auto_backup }}</span>
+          <el-switch
+            :model-value="status.autoBackup"
+            :loading="autoSaving"
+            @change="toggleAuto('autoBackup', $event)" />
+        </div>
+      </el-tooltip>
+      <span class="auto-divider"></span>
+      <el-tooltip :content="L10n.auto_sync_tip" placement="top">
+        <div class="auto-item">
+          <span class="auto-title">{{ L10n.auto_sync }}</span>
+          <el-switch
+            :model-value="status.autoSync"
+            :loading="autoSaving"
+            @change="toggleAuto('autoSync', $event)" />
+        </div>
+      </el-tooltip>
+    </div>
+
     <div class="button-row">
       <el-button
         type="primary"
@@ -59,7 +81,9 @@
     <el-dialog
       v-model="syncVisible"
       :title="L10n.select_version_title"
-      width="680">
+      width="1080"
+      align-center
+      class="sync-dialog">
       <el-table
         :data="versions"
         row-key="key"
@@ -67,21 +91,61 @@
         highlight-current-row
         :empty-text="L10n.no_snapshots"
         @current-change="onSelectVersion">
-        <el-table-column :label="L10n.version" width="180">
+        <el-table-column :label="L10n.version" width="168">
           <template #default="{ row }">
             <span>{{ row.kind === "local" ? L10n.local_version : row.created_at }}</span>
+            <el-tag
+              v-if="row.kind === 'cloud'"
+              size="small"
+              class="mode-tag"
+              :type="row.mode === 'auto' ? 'info' : 'primary'">
+              {{ row.mode === "auto" ? L10n.auto_backup_tag : L10n.manual_backup_tag }}
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="L10n.device" width="150">
+        <el-table-column :label="L10n.device" width="136">
           <template #default="{ row }">{{ row.device_label }}</template>
         </el-table-column>
-        <el-table-column :label="L10n.record_count" width="90">
-          <template #default="{ row }">{{ row.record_count }}</template>
+        <el-table-column :label="L10n.record_count" width="92" align="center">
+          <template #default="{ row }">
+            <span>{{ row.counts ? row.counts.record : "-" }}</span>
+            <span v-if="diffOf(row, 'record')" class="count-diff">{{ diffOf(row, "record") }}</span>
+          </template>
         </el-table-column>
-        <el-table-column :label="L10n.size" width="90">
+        <el-table-column :label="L10n.salary" width="78" align="center">
+          <template #default="{ row }">
+            <span>{{ row.counts ? row.counts.salary : "-" }}</span>
+            <span v-if="diffOf(row, 'salary')" class="count-diff">{{ diffOf(row, "salary") }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="L10n.annual_bonus" width="88" align="center">
+          <template #default="{ row }">
+            <span>{{ row.counts ? row.counts.bonus : "-" }}</span>
+            <span v-if="diffOf(row, 'bonus')" class="count-diff">{{ diffOf(row, "bonus") }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="L10n.budget" width="76" align="center">
+          <template #default="{ row }">
+            <span>{{ row.counts ? row.counts.budget : "-" }}</span>
+            <span v-if="diffOf(row, 'budget')" class="count-diff">{{ diffOf(row, "budget") }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="L10n.deposit" width="76" align="center">
+          <template #default="{ row }">
+            <span>{{ row.counts ? row.counts.deposit : "-" }}</span>
+            <span v-if="diffOf(row, 'deposit')" class="count-diff">{{ diffOf(row, "deposit") }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="L10n.category" width="76" align="center">
+          <template #default="{ row }">
+            <span>{{ row.counts ? row.counts.category : "-" }}</span>
+            <span v-if="diffOf(row, 'category')" class="count-diff">{{ diffOf(row, "category") }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="L10n.size" width="80">
           <template #default="{ row }">{{ formatSize(row.size) }}</template>
         </el-table-column>
-        <el-table-column width="120">
+        <el-table-column width="110">
           <template #default="{ row }">
             <el-tag v-if="row.kind === 'local'" size="small" type="info">
               {{ L10n.current }}
@@ -95,6 +159,7 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="count-tip">{{ L10n.sync_count_diff_tip }}</div>
       <el-alert
         class="sync-alert"
         :title="actionTip"
@@ -128,6 +193,7 @@ import { logError, logInfo } from "@/utils/DataCenter";
 import {
   CloudSnapshot,
   CloudSyncStatus,
+  DataCounts,
   backupToCloud,
   chooseCloudSyncDir,
   fetchCloudSnapshots,
@@ -135,6 +201,7 @@ import {
   formatSize,
   openCloudSyncDir,
   restoreCloudSnapshot,
+  updateCloudSyncSettings,
 } from "./CloudSyncManager";
 
 type SyncVersionKind = "local" | "cloud";
@@ -142,6 +209,8 @@ type SyncVersionKind = "local" | "cloud";
 interface SyncVersion {
   key: string;
   kind: SyncVersionKind;
+  mode?: "manual" | "auto";
+  counts?: DataCounts | null;
   created_at: string;
   device_label: string;
   record_count: number;
@@ -153,6 +222,7 @@ interface SyncVersion {
 
 const status = ref<CloudSyncStatus | null>(null);
 const syncing = ref(false);
+const autoSaving = ref(false);
 const syncVisible = ref(false);
 const versions = ref<SyncVersion[]>([]);
 const selectedVersion = ref<SyncVersion | null>(null);
@@ -212,6 +282,7 @@ function localVersion(): SyncVersion {
     size: status.value ? status.value.local_size : 0,
     downloaded: true,
     is_latest: false,
+    counts: status.value ? status.value.counts : null,
     snapshot: "",
   };
 }
@@ -226,8 +297,31 @@ function toVersion(item: CloudSnapshot): SyncVersion {
     size: item.size,
     downloaded: item.downloaded,
     is_latest: item.is_latest,
+    mode: item.mode,
+    counts: item.counts,
     snapshot: item.snapshot,
   };
+}
+
+async function toggleAuto(key: "autoBackup" | "autoSync", value: boolean) {
+  if (!status.value) {
+    return;
+  }
+  const patch = {
+    autoBackup: status.value.autoBackup,
+    autoSync: status.value.autoSync,
+    [key]: value === true,
+  };
+  autoSaving.value = true;
+  try {
+    status.value = await updateCloudSyncSettings(patch);
+    ElMessage.success(L10n.auto_setting_saved);
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : L10n.unknown_error);
+    await refresh();
+  } finally {
+    autoSaving.value = false;
+  }
 }
 
 async function openSync() {
@@ -244,6 +338,17 @@ async function openSync() {
     logError("fetch cloud snapshots failed:" + error);
     ElMessage.error(error instanceof Error ? error.message : L10n.unknown_error);
   }
+}
+
+function diffOf(row: SyncVersion, key: keyof DataCounts): string {
+  if (row.kind === "local" || !row.counts || !status.value || !status.value.counts) {
+    return "";
+  }
+  const diff = Number(row.counts[key] || 0) - Number(status.value.counts[key] || 0);
+  if (!diff) {
+    return "";
+  }
+  return diff > 0 ? `(+${diff})` : `(${diff})`;
 }
 
 function onSelectVersion(row: SyncVersion | null) {
@@ -339,16 +444,65 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+
 .cloud-sync {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
   width: 100%;
   text-align: left;
+}
+
+.auto-settings {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  background-color: #fafafc;
+  border: 1px solid #f2f3f6;
+  border-radius: 10px;
+}
+
+.auto-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.auto-title {
+  font-size: 12px;
+  color: #5a6274;
+  white-space: nowrap;
+}
+
+.auto-divider {
+  width: 1px;
+  height: 14px;
+  background-color: #e3e5ea;
+}
+
+.mode-tag {
+  margin-left: 8px;
+}
+
+.count-diff {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #b26a00;
+}
+
+.count-tip {
+  margin: 6px 2px 0;
+  font-size: 11px;
+  color: #9aa0ad;
 }
 
 .folder-line {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
   font-size: 12px;
 }
 
@@ -366,8 +520,8 @@ onUnmounted(() => {
 }
 
 .sync-tip {
-  margin-bottom: 12px;
-  padding: 8px 10px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
   background-color: #fff8ec;
   border-radius: 8px;
   font-size: 11px;
@@ -378,8 +532,7 @@ onUnmounted(() => {
 .sync-meta {
   display: flex;
   flex-direction: column;
-  margin-bottom: 12px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   background-color: #fafafc;
   border: 1px solid #f2f3f6;
   border-radius: 10px;
@@ -390,7 +543,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 22px;
+  min-height: 20px;
   font-size: 12px;
 }
 
@@ -441,7 +594,6 @@ onUnmounted(() => {
 .button-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 6px;
 }
 
 .link-row {

@@ -185,6 +185,7 @@ async function save() {
     } else {
       await createBonus(form.value);
     }
+    ElMessage.success(isEdit.value ? L10n.bonus_updated : L10n.bonus_added);
     emit("saved");
     close();
   } catch (error) {

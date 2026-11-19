@@ -21,6 +21,15 @@
     <el-tab-pane>
       <template #label>
         <span class="custom-tabs-label">
+          <el-icon class="panel_icon"><Coin /></el-icon>
+          <span class="panel_title">{{ L10n.deposit }}</span>
+        </span>
+      </template>
+      <DepositHome></DepositHome>
+    </el-tab-pane>
+    <el-tab-pane>
+      <template #label>
+        <span class="custom-tabs-label">
           <el-icon class="panel_icon"><PieChart /></el-icon>
           <span class="panel_title">{{ L10n.analysis }}</span>
         </span>
@@ -40,16 +49,45 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
+import { ElMessage } from "element-plus";
 import type { TabsInstance } from "element-plus";
-import { Grid, PieChart, Setting, Wallet } from "@element-plus/icons-vue";
+import { IpcType } from "@/models/IpcResponse";
+import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
+import { updateCurrentCategory } from "@/configs/CategoryParser";
+import { Coin, Grid, PieChart, Setting, Wallet } from "@element-plus/icons-vue";
 import DashboardHome from "./dashboard/MainHome.vue";
 import L10n from "@/configs/L10n.json";
 import AnalysisHome from "./analysis/MainHome.vue";
 import PayrollHome from "./payroll/MainHome.vue";
+import DepositHome from "./deposit/MainHome.vue";
 import SettingHome from "./settings/MainHome.vue";
 
 const tabPosition = ref<TabsInstance["tabPosition"]>("left");
+
+let unsubscribeCloud: (() => void) | null = null;
+
+onMounted(() => {
+  unsubscribeCloud = (window.electron.ipcRenderer.on as any)(
+    IpcType.CLOUD_SYNC_EVENT,
+    (payload: any) => {
+      if (payload && payload.type === "restore" && payload.auto) {
+        if (payload.category_restored) {
+          updateCurrentCategory();
+        }
+        notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
+        ElMessage.success(L10n.auto_restore_notice);
+      }
+    }
+  );
+});
+
+onUnmounted(() => {
+  if (unsubscribeCloud) {
+    unsubscribeCloud();
+    unsubscribeCloud = null;
+  }
+});
 </script>
 
 <style scoped>

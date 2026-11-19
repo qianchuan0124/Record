@@ -32,9 +32,15 @@ const SNAPSHOT_PREFIX = "record_";
 const SNAPSHOT_SUFFIX = ".db";
 const CATEGORY_SUFFIX = ".categories.json";
 const MANIFEST_NAME = "latest.json";
-const SNAPSHOT_KEEP_PER_DEVICE = 3;
+const SNAPSHOT_KEEP_MANUAL = 2;
+const SNAPSHOT_KEEP_AUTO = 3;
 const LOCAL_BACKUP_KEEP = 5;
-const SNAPSHOT_NAME_RE = /^record_(\d{8}_\d{6})_([0-9a-f]{4})(?:_(\d+))?\.db$/;
+// 数据变更后延迟 1 分钟再自动备份，避免频繁写 iCloud；可用环境变量缩短用于测试
+const AUTO_BACKUP_DELAY_MS = Number(process.env.RECORD_AUTO_BACKUP_DELAY_MS) || 60 * 1000;
+const AUTO_CHECK_INTERVAL_MS = Number(process.env.RECORD_AUTO_CHECK_MS) || 15 * 1000;
+const SNAPSHOT_NAME_RE = /^record_(\d{8}_\d{6})_([0-9a-f]{4})(?:_(auto|manual))?(?:_(\d+))?\.db$/;
+
+type SnapshotMode = "manual" | "auto";
 
 export class CloudSyncError extends Error { }
 
@@ -43,6 +49,18 @@ interface CloudSyncSettings {
     lastSnapshot: string;
     lastState: string;
     lastTime: string;
+    lastSyncedTs: number;
+    autoBackup: boolean;
+    autoSync: boolean;
+}
+
+interface DataCounts {
+    record: number;
+    salary: number;
+    bonus: number;
+    budget: number;
+    deposit: number;
+    category: number;
 }
 
 interface SnapshotManifest {
@@ -53,13 +71,15 @@ interface SnapshotManifest {
     app_version: string;
     sha256: string;
     size: number;
-    counts: { record: number };
+    counts: Partial<DataCounts> & { record: number };
     custom_category: boolean;
 }
 
 export interface CloudSnapshotItem {
     snapshot: string;
     tag: string;
+    mode: SnapshotMode;
+    counts: DataCounts | null;
     created_at: string;
     created_ts: number;
     device_label: string;
@@ -78,6 +98,9 @@ const defaultSettings: CloudSyncSettings = {
     lastSnapshot: "",
     lastState: "",
     lastTime: "",
+    lastSyncedTs: 0,
+    autoBackup: false,
+    autoSync: false,
 };
 
 let listenersRegistered = false;
@@ -106,6 +129,9 @@ function readSettings(): CloudSyncSettings {
             lastSnapshot: typeof parsed.lastSnapshot === "string" ? parsed.lastSnapshot : "",
             lastState: typeof parsed.lastState === "string" ? parsed.lastState : "",
             lastTime: typeof parsed.lastTime === "string" ? parsed.lastTime : "",
+            lastSyncedTs: Number(parsed.lastSyncedTs) || parseDateTime(parsed.lastTime),
+            autoBackup: parsed.autoBackup === true,
+            autoSync: parsed.autoSync === true,
         };
     } catch (error) {
         return { ...defaultSettings };
@@ -261,6 +287,76 @@ function closeConnection(conn: sqlite3.Database): Promise<void> {
     return new Promise((resolve) => conn.close(() => resolve()));
 }
 
+function countCustomCategories(file: string): number {
+    try {
+        const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+        const customs = parsed && parsed.category && Array.isArray(parsed.category.custom)
+            ? parsed.category.custom
+            : [];
+        let total = 0;
+        const walk = (nodes: any[]) => {
+            for (const node of nodes) {
+                if (!node) {
+                    continue;
+                }
+                total += 1;
+                if (Array.isArray(node.children)) {
+                    walk(node.children);
+                }
+            }
+        };
+        walk(customs);
+        return total;
+    } catch (error) {
+        return 0;
+    }
+}
+
+async function countsOfDatabase(file: string): Promise<DataCounts> {
+    const conn = await openReadonly(file);
+    try {
+        const tables = await queryAll(conn, "SELECT name FROM sqlite_master WHERE type='table'") as { name: string }[];
+        const names = new Set(tables.map((row) => row.name));
+        const countTable = async (table: string) => {
+            if (!names.has(table)) {
+                return 0;
+            }
+            const row = await queryOne(conn, `SELECT COUNT(*) AS total FROM ${table} WHERE isDeleted = 0`);
+            return Number((row && row.total) || 0);
+        };
+        return {
+            record: await countTable("record"),
+            salary: await countTable("salary_record"),
+            bonus: await countTable("annual_bonus"),
+            budget: await countTable("budget_item"),
+            deposit: await countTable("deposit_record"),
+            category: 0,
+        };
+    } finally {
+        await closeConnection(conn);
+    }
+}
+
+async function localDataCounts(): Promise<DataCounts> {
+    const conn = getDb();
+    const count = async (table: string) => {
+        try {
+            const row = await queryOne(conn, `SELECT COUNT(*) AS total FROM ${table} WHERE isDeleted = 0`);
+            return Number((row && row.total) || 0);
+        } catch (error) {
+            return 0;
+        }
+    };
+    return {
+        record: await count("record"),
+        salary: await count("salary_record"),
+        bonus: await count("annual_bonus"),
+        budget: await count("budget_item"),
+        deposit: await count("deposit_record"),
+        category: countCustomCategories(customCategoryPath),
+    };
+}
+
 // sqlite3 5.1.6 的类型声明里没有 backup，运行时需要先初始化再逐步 step，这里补上类型
 interface SqliteBackup {
     step(pages: number, callback: (err: Error | null, done?: boolean) => void): void;
@@ -354,13 +450,27 @@ async function sha256File(file: string): Promise<string> {
  */
 async function contentState(): Promise<string> {
     try {
-        const rows = await queryAll(
-            getDb(),
-            "SELECT id, amount, type, date, category, subCategory, remark, isDeleted, syncId FROM record ORDER BY id"
-        );
         const hash = crypto.createHash("sha256");
-        for (const row of rows) {
+        const recordRows = await queryAll(
+            getDb(),
+            "SELECT id, amount, type, date, category, subCategory, remark, isDeleted, syncId, countInBudget FROM record ORDER BY id"
+        );
+        for (const row of recordRows) {
             hash.update(JSON.stringify(row));
+        }
+        const payrollTables = [
+            "SELECT id, date, baseSalary, overtimePay, oneTimeBonus, socialInsurance, tax, taxRate, netPay, taxManual, syncId FROM salary_record ORDER BY id",
+            "SELECT id, date, bonus, tax, taxRate, netPay, syncId FROM annual_bonus ORDER BY id",
+            "SELECT id, name, amount, syncId FROM budget_item ORDER BY id",
+            "SELECT id, name, icon, syncId FROM deposit_bank ORDER BY id",
+            "SELECT id, bankKey, startDate, amount, years, rate, interest, sortOrder, syncId FROM deposit_record ORDER BY id",
+        ];
+        for (const sql of payrollTables) {
+            const rows = await queryAll(getDb(), sql);
+            hash.update(sql);
+            for (const row of rows) {
+                hash.update(JSON.stringify(row));
+            }
         }
         try {
             hash.update(await fsp.readFile(customCategoryPath));
@@ -393,7 +503,22 @@ function writeManifest(folder: string, manifest: SnapshotManifest) {
     fs.renameSync(temp, path.join(folder, MANIFEST_NAME));
 }
 
-function parseSnapshotName(name: string): { tag: string; created: Date } | null {
+function parseDateTime(value: unknown): number {
+    if (typeof value !== "string" || !value) {
+        return 0;
+    }
+    const matched = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
+    if (!matched) {
+        return 0;
+    }
+    const date = new Date(
+        Number(matched[1]), Number(matched[2]) - 1, Number(matched[3]),
+        Number(matched[4]), Number(matched[5]), Number(matched[6])
+    );
+    return isNaN(date.getTime()) ? 0 : Math.floor(date.getTime() / 1000);
+}
+
+function parseSnapshotName(name: string): { tag: string; created: Date; mode: SnapshotMode } | null {
     const matched = SNAPSHOT_NAME_RE.exec(name);
     if (!matched) {
         return null;
@@ -410,7 +535,7 @@ function parseSnapshotName(name: string): { tag: string; created: Date } | null 
     if (isNaN(created.getTime())) {
         return null;
     }
-    return { tag: matched[2], created };
+    return { tag: matched[2], created, mode: matched[3] === "auto" ? "auto" : "manual" };
 }
 
 function categorySidecar(snapshot: string): string {
@@ -462,20 +587,23 @@ function pruneSnapshots(folder: string) {
         // 清理失败不影响备份
     }
 
-    const groups: Record<string, string[]> = {};
+    const groups: Record<string, { manual: string[]; auto: string[] }> = {};
     for (const item of listSnapshotFiles(folder)) {
         const info = parseSnapshotName(item.name);
         if (!info) {
             continue;
         }
         if (!groups[info.tag]) {
-            groups[info.tag] = [];
+            groups[info.tag] = { manual: [], auto: [] };
         }
-        groups[info.tag].push(item.name);
+        groups[info.tag][info.mode].push(item.name);
     }
-    for (const names of Object.values(groups)) {
-        names.sort().reverse();
-        for (const name of names.slice(SNAPSHOT_KEEP_PER_DEVICE)) {
+    for (const group of Object.values(groups)) {
+        const remove = [
+            ...group.manual.sort().reverse().slice(SNAPSHOT_KEEP_MANUAL),
+            ...group.auto.sort().reverse().slice(SNAPSHOT_KEEP_AUTO),
+        ];
+        for (const name of remove) {
             // 只删除已下载到本机的旧快照，iCloud 占位文件不主动删除，避免误删远端数据
             try {
                 fs.unlinkSync(path.join(folder, name));
@@ -491,13 +619,13 @@ function pruneSnapshots(folder: string) {
     }
 }
 
-function uniqueSnapshotName(folder: string): string {
+function uniqueSnapshotName(folder: string, mode: SnapshotMode): string {
     const stamp = stampText();
     const tag = deviceTag();
-    let name = `${SNAPSHOT_PREFIX}${stamp}_${tag}${SNAPSHOT_SUFFIX}`;
+    let name = `${SNAPSHOT_PREFIX}${stamp}_${tag}_${mode}${SNAPSHOT_SUFFIX}`;
     let index = 2;
     while (fs.existsSync(path.join(folder, name)) || fs.existsSync(path.join(folder, `.${name}.icloud`))) {
-        name = `${SNAPSHOT_PREFIX}${stamp}_${tag}_${index}${SNAPSHOT_SUFFIX}`;
+        name = `${SNAPSHOT_PREFIX}${stamp}_${tag}_${mode}_${index}${SNAPSHOT_SUFFIX}`;
         index += 1;
     }
     return name;
@@ -535,11 +663,11 @@ function backupResult(manifest: SnapshotManifest | null, folder: string, skipped
  * 把当前数据库写成一致性快照。
  * 内容没变且已存在快照时直接跳过，避免频繁往 iCloud 写文件。
  */
-export function createSnapshot(force = false): Promise<CloudBackupResult> {
-    return enqueueSnapshotTask(() => createSnapshotInternal(force));
+export function createSnapshot(force = false, mode: SnapshotMode = "manual"): Promise<CloudBackupResult> {
+    return enqueueSnapshotTask(() => createSnapshotInternal(force, mode));
 }
 
-async function createSnapshotInternal(force: boolean): Promise<CloudBackupResult> {
+async function createSnapshotInternal(force: boolean, mode: SnapshotMode): Promise<CloudBackupResult> {
     const folder = syncFolder(true);
     if (!folder) {
         throw new CloudSyncError("没有可用的同步目录，请先在设置中选择 iCloud 云盘目录");
@@ -558,7 +686,7 @@ async function createSnapshotInternal(force: boolean): Promise<CloudBackupResult
         return backupResult(current, folder, true);
     }
 
-    const name = uniqueSnapshotName(folder);
+    const name = uniqueSnapshotName(folder, mode);
     const finalFile = path.join(folder, name);
     const tempFile = path.join(folder, `.${name}.part`);
 
@@ -566,7 +694,7 @@ async function createSnapshotInternal(force: boolean): Promise<CloudBackupResult
     try {
         await fsp.rm(tempFile, { force: true });
         await backupDatabase(tempFile);
-        const count = await recordCountOf(tempFile);
+        const counts = await countsOfDatabase(tempFile);
         const size = fs.statSync(tempFile).size;
         fs.renameSync(tempFile, finalFile);
 
@@ -587,7 +715,7 @@ async function createSnapshotInternal(force: boolean): Promise<CloudBackupResult
             app_version: app.getVersion(),
             sha256: await sha256File(finalFile),
             size,
-            counts: { record: count },
+            counts: { ...counts, category: countCustomCategories(customCategoryPath) },
             custom_category: hasCategory,
         };
         writeManifest(folder, manifest);
@@ -606,9 +734,10 @@ async function createSnapshotInternal(force: boolean): Promise<CloudBackupResult
         lastSnapshot: name,
         lastState: state,
         lastTime: manifest.created_at,
+        lastSyncedTs: manifest.created_ts,
     });
-    logInfo(`cloud snapshot created: ${name}, records: ${manifest.counts.record}`);
-    broadcast({ type: "backup", status: "success", snapshot: name, created_at: manifest.created_at });
+    logInfo(`cloud snapshot created: ${name}, mode: ${mode}, records: ${manifest.counts.record}`);
+    broadcast({ type: "backup", status: "success", snapshot: name, created_at: manifest.created_at, mode });
     return backupResult(manifest, folder, false);
 }
 
@@ -627,16 +756,25 @@ export async function listSnapshots(): Promise<CloudSnapshotItem[]> {
             continue;
         }
         const isLatest = !!manifest && manifest.snapshot === entry.name;
-        let recordCount = 0;
+        let counts: DataCounts | null = null;
         if (entry.downloaded) {
             try {
-                recordCount = await recordCountOf(entry.file);
+                counts = await countsOfDatabase(entry.file);
+                counts.category = countCustomCategories(path.join(folder, categorySidecar(entry.name)));
             } catch (error) {
-                recordCount = 0;
+                counts = null;
             }
         }
-        if (isLatest && manifest) {
-            recordCount = Number((manifest && manifest.counts && manifest.counts.record) || recordCount);
+        if (!counts && isLatest && manifest) {
+            const manifestCounts = manifest.counts || { record: 0 };
+            counts = {
+                record: Number(manifestCounts.record || 0),
+                salary: Number(manifestCounts.salary || 0),
+                bonus: Number(manifestCounts.bonus || 0),
+                budget: Number(manifestCounts.budget || 0),
+                deposit: Number(manifestCounts.deposit || 0),
+                category: Number(manifestCounts.category || 0),
+            };
         }
         let size = 0;
         if (entry.downloaded) {
@@ -649,6 +787,8 @@ export async function listSnapshots(): Promise<CloudSnapshotItem[]> {
         items.push({
             snapshot: entry.name,
             tag: info.tag,
+            mode: info.mode,
+            counts,
             created_at: isLatest && manifest
                 ? manifest.created_at
                 : formatDateTime(info.created),
@@ -660,7 +800,7 @@ export async function listSnapshots(): Promise<CloudSnapshotItem[]> {
             is_latest: isLatest,
             downloaded: entry.downloaded,
             size,
-            record_count: recordCount,
+            record_count: counts ? counts.record : 0,
             has_category: entry.downloaded && isFile(path.join(folder, categorySidecar(entry.name))),
             app_version: isLatest && manifest ? manifest.app_version : "",
             sha256: isLatest && manifest ? manifest.sha256 : "",
@@ -738,10 +878,10 @@ export interface CloudRestoreResult {
 
 /** 用云端快照覆盖本地数据库，覆盖前自动备份本机数据库 */
 export function restoreSnapshot(snapshot: string): Promise<CloudRestoreResult> {
-    return enqueueSnapshotTask(() => restoreSnapshotInternal(snapshot));
+    return enqueueSnapshotTask(() => restoreSnapshotInternal(snapshot, false));
 }
 
-async function restoreSnapshotInternal(snapshot: string): Promise<CloudRestoreResult> {
+async function restoreSnapshotInternal(snapshot: string, auto = false): Promise<CloudRestoreResult> {
     const folder = syncFolder();
     if (!folder) {
         throw new CloudSyncError("没有可用的同步目录");
@@ -807,13 +947,17 @@ async function restoreSnapshotInternal(snapshot: string): Promise<CloudRestoreRe
     }
 
     const state = await contentState();
+    const syncedTs = manifest && manifest.snapshot === snapshot
+        ? Number(manifest.created_ts) || Math.floor(Date.now() / 1000)
+        : Math.floor(Date.now() / 1000);
     writeSettings({
         lastSnapshot: snapshot,
         lastState: state,
         lastTime: nowText(),
+        lastSyncedTs: syncedTs,
     });
-    logInfo(`cloud snapshot restored: ${snapshot}, records: ${recordCount}`);
-    broadcast({ type: "restore", status: "success", snapshot });
+    logInfo(`cloud snapshot restored: ${snapshot}, records: ${recordCount}, auto: ${auto}`);
+    broadcast({ type: "restore", status: "success", snapshot, auto, category_restored: categoryRestored });
     return {
         snapshot,
         record_count: recordCount,
@@ -825,6 +969,9 @@ async function restoreSnapshotInternal(snapshot: string): Promise<CloudRestoreRe
 
 export interface CloudSyncStatus {
     platform: string;
+    autoBackup: boolean;
+    autoSync: boolean;
+    counts: DataCounts;
     folder: string;
     detected: boolean;
     available: boolean;
@@ -845,12 +992,11 @@ export async function cloudSyncStatus(): Promise<CloudSyncStatus> {
     const available = !!folder && isDirectory(folder);
     const manifest = available ? readManifest(folder) : null;
     const state = available ? await contentState() : "";
-    let recordCount = 0;
+    let counts: DataCounts = { record: 0, salary: 0, bonus: 0, budget: 0, deposit: 0, category: 0 };
     try {
-        const row = await queryOne(getDb(), "SELECT COUNT(*) AS total FROM record WHERE isDeleted = 0");
-        recordCount = Number((row && row.total) || 0);
+        counts = await localDataCounts();
     } catch (error) {
-        recordCount = 0;
+        counts = { record: 0, salary: 0, bonus: 0, budget: 0, deposit: 0, category: 0 };
     }
     let localSize = 0;
     try {
@@ -864,13 +1010,16 @@ export async function cloudSyncStatus(): Promise<CloudSyncStatus> {
     }
     return {
         platform: process.platform,
+        autoBackup: settings.autoBackup,
+        autoSync: settings.autoSync,
         folder,
         detected: !!settings.dir || detectedDirs().length > 0,
         available,
         lastTime: settings.lastTime,
         lastSnapshot: settings.lastSnapshot,
         dirty: !!state && state !== settings.lastState,
-        record_count: recordCount,
+        counts,
+        record_count: counts.record,
         local_size: localSize,
         latest: manifest,
         latest_downloaded: !!(manifest && isFile(path.join(folder, manifest.snapshot))),
@@ -917,6 +1066,110 @@ function fail(error: unknown) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) };
 }
 
+let autoTimer: ReturnType<typeof setInterval> | null = null;
+let autoBusy = false;
+let pendingBackupAt = 0;
+let firstAutoTick = true;
+let autoSyncRetryAt = 0;
+
+/**
+ * 自动备份/同步：
+ * - 数据变更后延迟 1 分钟自动备份（每台机器保留 2 份手动 + 3 份自动）
+ * - 本地干净且云端出现更新的快照时，自动拉取最新一份
+ */
+export function startCloudAutoSync() {
+    if (autoTimer) {
+        return;
+    }
+    autoTimer = setInterval(() => {
+        void autoTick();
+    }, AUTO_CHECK_INTERVAL_MS);
+    setTimeout(() => {
+        void autoTick();
+    }, 5000);
+}
+
+async function autoTick() {
+    if (autoBusy) {
+        return;
+    }
+    const settings = readSettings();
+    if (!settings.autoBackup && !settings.autoSync) {
+        pendingBackupAt = 0;
+        return;
+    }
+    const folder = syncFolder();
+    if (!folder || !isDirectory(folder)) {
+        return;
+    }
+
+    let state = "";
+    try {
+        state = await contentState();
+    } catch (error) {
+        return;
+    }
+    if (!state) {
+        return;
+    }
+
+    if (state !== settings.lastState) {
+        // 有未备份的改动：等待防抖时间后自动上传，本地改动优先
+        if (!pendingBackupAt) {
+            // 启动后的首次检查若有遗留改动，立即备份
+            pendingBackupAt = firstAutoTick ? Date.now() - AUTO_BACKUP_DELAY_MS : Date.now();
+        }
+        if (Date.now() - pendingBackupAt < AUTO_BACKUP_DELAY_MS) {
+            return;
+        }
+        autoBusy = true;
+        try {
+            await enqueueSnapshotTask(() => createSnapshotInternal(false, "auto"));
+            pendingBackupAt = 0;
+        } catch (error) {
+            logError("auto backup failed:" + error);
+            // 失败后 5 分钟内不再重试，避免反复写盘/报错
+            pendingBackupAt = Date.now() + 5 * 60 * 1000;
+        } finally {
+            autoBusy = false;
+            firstAutoTick = false;
+        }
+        return;
+    }
+
+    pendingBackupAt = 0;
+    firstAutoTick = false;
+    if (!settings.autoSync) {
+        return;
+    }
+
+    // 本地干净，检查云端是否有更新的快照（以最新时间为准）
+    if (Date.now() < autoSyncRetryAt) {
+        return;
+    }
+    const manifest = readManifest(folder);
+    if (!manifest || manifest.snapshot === settings.lastSnapshot) {
+        return;
+    }
+    const latestTs = Number(manifest.created_ts) || 0;
+    if (latestTs <= (Number(settings.lastSyncedTs) || 0)) {
+        return;
+    }
+    if (!isFile(path.join(folder, manifest.snapshot))) {
+        return;
+    }
+
+    autoBusy = true;
+    try {
+        await enqueueSnapshotTask(() => restoreSnapshotInternal(manifest.snapshot, true));
+    } catch (error) {
+        logError("auto sync failed:" + error);
+        autoSyncRetryAt = Date.now() + 5 * 60 * 1000;
+    } finally {
+        autoBusy = false;
+    }
+}
+
 export function cloudSyncListeners() {
     if (listenersRegistered) {
         return;
@@ -957,6 +1210,22 @@ export function cloudSyncListeners() {
         }
     });
 
+    ipcMain.handle(IpcType.CLOUD_SYNC_SETTINGS, async (event, patch) => {
+        try {
+            const source = patch && typeof patch === "object" ? patch : {};
+            const current = readSettings();
+            writeSettings({
+                autoBackup: "autoBackup" in source ? source.autoBackup === true : current.autoBackup,
+                autoSync: "autoSync" in source ? source.autoSync === true : current.autoSync,
+            });
+            pendingBackupAt = 0;
+            void autoTick();
+            return ok(await cloudSyncStatus());
+        } catch (error) {
+            return fail(error);
+        }
+    });
+
     ipcMain.handle(IpcType.CLOUD_SYNC_CHOOSE_DIR, async () => {
         try {
             return ok(await chooseSyncDir());
@@ -972,4 +1241,6 @@ export function cloudSyncListeners() {
             return fail(error);
         }
     });
+
+    startCloudAutoSync();
 }

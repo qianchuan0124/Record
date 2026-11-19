@@ -93,7 +93,7 @@
       <span class="import-tip">{{ L10n.import_data_tips }}</span>
     </div>
 
-    <el-dialog v-model="tipVisible" :title="L10n.data_handle" width="500">
+    <el-dialog v-model="tipVisible" :title="L10n.data_handle" width="500" align-center>
       <span>{{ tipInfo }}</span>
       <template #footer>
         <div class="dialog-footer">
@@ -107,7 +107,8 @@
     <el-dialog
       v-model="importFailedVisible"
       :title="L10n.failed_info"
-      width="500">
+      width="500"
+      align-center>
       <el-table :data="failedData">
         <el-table-column
           property="errorIndex"
@@ -120,7 +121,7 @@
       </el-table>
     </el-dialog>
 
-    <el-dialog v-model="syncDataVisible" witdh="500" height="500">
+    <el-dialog v-model="syncDataVisible" width="640" align-center>
       <div v-if="syncType === 'prepare'" class="sync-start-container">
         <div class="sync-start-left">
           <span class="sync-title">{{ L10n.sync_data }}</span>
@@ -413,7 +414,9 @@ const svg = `
 .data-handle {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  height: 100%;
+  min-height: 0;
 }
 
 .action-row {
@@ -424,15 +427,17 @@ const svg = `
 
 .action-btn {
   width: 100%;
-  height: 36px;
+  height: 32px;
   margin-left: 0 !important;
 }
 
 .import-section {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 12px;
+  min-height: 0;
+  gap: 4px;
+  padding-top: 8px;
   border-top: 1px solid #f2f3f6;
 }
 
@@ -457,11 +462,11 @@ const svg = `
 .column-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .column-chip {
-  padding: 2px 8px;
+  padding: 1px 6px;
   background-color: #f6f5fb;
   border-radius: 10px;
   font-size: 11px;
@@ -470,15 +475,31 @@ const svg = `
 
 .upload-file {
   display: flex;
+  flex: 1;
   align-items: center;
   gap: 12px;
   width: 100%;
+  min-height: 0;
   text-align: left;
 }
 
 .upload-select {
   flex: 1;
+  align-self: stretch;
   min-width: 0;
+  height: 100%;
+}
+
+.upload-select :deep(.el-upload) {
+  height: 100%;
+}
+
+.upload-select :deep(.el-upload-dragger) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
 }
 
 .upload-select :deep(.el-upload) {
@@ -486,7 +507,7 @@ const svg = `
 }
 
 .upload-select :deep(.el-upload-dragger) {
-  padding: 12px 12px;
+  padding: 8px 10px;
   background-color: #fafafb;
   border: 1px dashed #e3e5ea;
   border-radius: 8px;
@@ -499,14 +520,14 @@ const svg = `
 }
 
 .upload-select :deep(.el-icon--upload) {
-  margin-bottom: 2px;
-  font-size: 24px;
+  margin-bottom: 0;
+  font-size: 20px;
   color: #b9bdc7;
 }
 
 .upload-select :deep(.el-upload__text) {
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 11px;
+  line-height: 1.5;
   color: #5a6274;
 }
 
@@ -570,5 +591,11 @@ const svg = `
 
 .el-button + .el-button {
   margin-left: 0px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 </style>

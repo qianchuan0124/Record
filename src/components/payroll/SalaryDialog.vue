@@ -236,6 +236,7 @@ async function save() {
     } else {
       await createSalary(form.value);
     }
+    ElMessage.success(isEdit.value ? L10n.salary_updated : L10n.salary_added);
     emit("saved");
     close();
   } catch (error) {

@@ -1,13 +1,11 @@
 <template>
   <div class="total-data">
-    <div v-if="isEmpty" class="empty-wrapper">
+    <div v-if="loaded && isEmpty" class="empty-wrapper">
       <img class="empty-page" src="@/assets/empty_page.svg" />
     </div>
     <div class="chart-wrap">
       <div ref="myEchart" class="chart"></div>
-      <div
-        v-if="totalIncome > 0 || totalOutcome > 0"
-        class="overview-footer">
+      <div class="overview-footer">
         <div v-if="totalOutcome > 0" class="overview-item">
           <span class="overview-label">{{ L10n.all_expense }}</span>
           <span class="overview-value expense">{{ formatAmount(totalOutcome) }}</span>
@@ -106,6 +104,7 @@ import { ElMessage } from "element-plus";
 const myEchart = ref<HTMLElement | null>(null);
 const myChart = ref<echarts.ECharts | null>(null);
 const isEmpty = ref(true);
+const loaded = ref(false);
 const totalIncome = ref(0);
 const totalOutcome = ref(0);
 
@@ -131,6 +130,7 @@ function updateTreeHeight() {
 }
 
 let chartObserver: ResizeObserver | null = null;
+let initTimer: number | null = null;
 let chartWidth = 0;
 let chartHeight = 0;
 
@@ -171,16 +171,29 @@ function setupChart(): boolean {
   return true;
 }
 
+function setupChartWithRetry(attempt = 0) {
+  if (myChart.value) {
+    return;
+  }
+  if (setupChart()) {
+    return;
+  }
+  // 首次进入页签时容器可能还没完成布局，短暂重试，避免图表一直空白
+  if (attempt < 20) {
+    initTimer = window.setTimeout(() => setupChartWithRetry(attempt + 1), 50);
+  }
+}
+
 onMounted(() => {
   const el = myEchart.value;
   if (!el) {
     return;
   }
-  setupChart();
+  setupChartWithRetry();
   // 页签隐藏时容器尺寸为 0，初始化会失败；用 ResizeObserver 在容器尺寸变化时补初始化/重绘
   chartObserver = new ResizeObserver(() => {
     if (!myChart.value) {
-      setupChart();
+      setupChartWithRetry();
     } else {
       resizeChart();
     }
@@ -209,6 +222,10 @@ onDeactivated(() => {
 
 onUnmounted(() => {
   disableNotify();
+  if (initTimer) {
+    window.clearTimeout(initTimer);
+    initTimer = null;
+  }
   chartObserver?.disconnect();
   window.removeEventListener("resize", resizeChart);
   myChart.value?.dispose();
@@ -237,6 +254,7 @@ async function loadData() {
       fetchTotalAmount(),
     ]);
     isEmpty.value = totalData.length === 0;
+    loaded.value = true;
     totalIncome.value = amount.income;
     totalOutcome.value = amount.outcome;
     const option = {
@@ -285,6 +303,7 @@ async function loadData() {
     };
     myChart.value?.setOption(option);
   } catch (error) {
+    loaded.value = true;
     logError("total load data failed " + error);
     if (error instanceof Error) {
       ElMessage.error(error.message);
@@ -352,11 +371,11 @@ const data = ref<CategoryNode[]>([]);
 
 .overview-footer {
   display: flex;
-  flex: 0 0 auto;
-  align-items: baseline;
+  flex: 0 0 46px;
+  align-items: center;
   justify-content: center;
   gap: 40px;
-  padding: 12px 0 6px;
+  height: 46px;
   border-top: 1px solid #f2f3f6;
 }
 
@@ -454,6 +473,11 @@ const data = ref<CategoryNode[]>([]);
 .detail-container {
   flex: 1;
   min-height: 0;
+}
+
+/* 虚拟列表的滚动条是覆盖式，给每行右侧留出空间，避免盖住金额文字 */
+.detail-container :deep(.el-tree-node__content) {
+  padding-right: 18px;
 }
 
 .detail-title {

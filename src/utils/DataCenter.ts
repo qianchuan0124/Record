@@ -5,6 +5,7 @@ import { SingleYearlyData, TotalCategory, SingleCategoryData, YearlyData, TimeLi
 import { CategorySettingNode } from "@/models/CategorySettingNode"
 import { CategoryNodeItem } from '@/models/CategoryNodeItem'
 import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from '@/models/Payroll'
+import { DepositBank, DepositData, DepositRecord } from '@/models/Deposit'
 
 export function logInfo(content: string) {
     window.electron.ipcRenderer.invoke('logger', 'info', ' [renderer] ' + content);
@@ -475,6 +476,125 @@ export async function importPayroll(payload: { salaries?: SalaryRecord[]; bonuse
     }
     catch (error: unknown) {
         logError("Importing payroll failed:" + error);
+        throw error;
+    }
+}
+
+// Deposit Network
+
+export async function fetchDepositData(): Promise<DepositData> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.FETCH_DEPOSIT_DATA);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as DepositData;
+    }
+    catch (error: unknown) {
+        logError("Fetching deposit data failed:" + error);
+        throw error;
+    }
+}
+
+export async function createBank(bank: DepositBank): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.CREATE_BANK, JSON.stringify(bank));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Creating bank failed:" + error);
+        throw error;
+    }
+}
+
+export async function updateBank(bank: DepositBank): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.UPDATE_BANK, JSON.stringify(bank));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Updating bank failed:" + error);
+        throw error;
+    }
+}
+
+export async function deleteBank(id: number): Promise<void> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.DELETE_BANK, id);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+    }
+    catch (error: unknown) {
+        logError("Deleting bank failed:" + error);
+        throw error;
+    }
+}
+
+export async function createDeposit(deposit: DepositRecord): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.CREATE_DEPOSIT, JSON.stringify(deposit));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Creating deposit failed:" + error);
+        throw error;
+    }
+}
+
+export async function updateDeposit(deposit: DepositRecord): Promise<number> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.UPDATE_DEPOSIT, JSON.stringify(deposit));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as number;
+    }
+    catch (error: unknown) {
+        logError("Updating deposit failed:" + error);
+        throw error;
+    }
+}
+
+export async function deleteDeposit(id: number): Promise<void> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.DELETE_DEPOSIT, id);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+    }
+    catch (error: unknown) {
+        logError("Deleting deposit failed:" + error);
+        throw error;
+    }
+}
+
+export async function reorderDeposits(ids: number[]): Promise<void> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.REORDER_DEPOSITS, JSON.stringify(ids));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+    }
+    catch (error: unknown) {
+        logError("Reordering deposits failed:" + error);
         throw error;
     }
 }

@@ -1,9 +1,20 @@
 import { IpcType } from "@/models/IpcResponse";
 import L10n from "@/configs/L10n.json";
 
+export interface DataCounts {
+  record: number;
+  salary: number;
+  bonus: number;
+  budget: number;
+  deposit: number;
+  category: number;
+}
+
 export interface CloudSnapshot {
   snapshot: string;
   tag: string;
+  mode: "manual" | "auto";
+  counts: DataCounts | null;
   created_at: string;
   created_ts: number;
   device_label: string;
@@ -25,12 +36,15 @@ export interface CloudSyncManifest {
   app_version: string;
   sha256: string;
   size: number;
-  counts: { record: number };
+  counts: Partial<DataCounts> & { record: number };
   custom_category: boolean;
 }
 
 export interface CloudSyncStatus {
   platform: string;
+  autoBackup: boolean;
+  autoSync: boolean;
+  counts: DataCounts;
   folder: string;
   detected: boolean;
   available: boolean;
@@ -71,6 +85,10 @@ async function invoke<T>(channel: string, ...args: any[]): Promise<T> {
 
 export function fetchCloudSyncStatus(): Promise<CloudSyncStatus> {
   return invoke<CloudSyncStatus>(IpcType.CLOUD_SYNC_STATUS);
+}
+
+export function updateCloudSyncSettings(patch: { autoBackup: boolean; autoSync: boolean }): Promise<CloudSyncStatus> {
+  return invoke<CloudSyncStatus>(IpcType.CLOUD_SYNC_SETTINGS, patch);
 }
 
 export function backupToCloud(force = false): Promise<CloudBackupResult> {

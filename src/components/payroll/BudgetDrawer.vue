@@ -120,6 +120,7 @@ async function save() {
   saving.value = true;
   try {
     await saveBudgets(valid);
+    ElMessage.success(L10n.budget_saved);
     emit("saved");
     close();
   } catch (error) {
