@@ -255,6 +255,51 @@ icon: path.join(app.getAppPath(), 'public/favicon.ico'),
 
 
 
+## Windows 打包
+
+```powershell
+npm run dist:win
+```
+
+产物：`dist_electron\Record-<版本>-x64.exe`（以及同名 `.blockmap` 和 `latest.yml`）。
+`scripts/electron-build.js` 会自动注入 `NODE_OPTIONS=--openssl-legacy-provider` 和
+`CSC_IDENTITY_AUTO_DISCOVERY=false`，不需要手动 `set`。
+
+### DSH 工作区里的 Low 完整性标签
+
+用 DeepSeek Harness 的 workspace-write 模式打开过本目录后，DSH 会在目录根写入一个可继承的
+Low 完整性标签，整个目录树都会继承，包括 `node_modules\7zip-bin\win\x64\7za.exe` 和
+`node_modules\app-builder-bin\win\x64\app-builder.exe`。Windows 按 exe 镜像上的标签决定进程
+完整性，于是这些构建工具都成了 Low 进程，表现为：
+
+- `Error: Exit code: 2. Command failed: ...\dist_electron\Record-x.x.x-x64.exe` ——
+  electron-builder 生成卸载器时运行的 NSIS 临时安装器起不来；
+- 7z 归档时报 `System ERROR: 未指定的错误`；
+- 把输出目录换到工作区外也不行：Low 进程写不了 `%LOCALAPPDATA%` 这类 Medium 目录。
+- 运行时同理：从工作区启动的应用（`win-unpacked\记账清单.exe` 或开发模式的
+  `node_modules\electron\dist\electron.exe`）是 Low 进程，写不了
+  `%APPDATA%\记账清单\logs\main.log`，报 `EPERM: operation not permitted`；这个异常若发生在
+  sqlite3 的原生回调里，会变成 `FATAL ERROR: Error::ThrowAsJavaScriptException napi_throw`
+  直接把进程打挂。`src/utils/Log.ts` 已在启动时探测日志可写性、不可写就禁用文件日志，
+  但根治仍是把 exe 标回 Medium。
+
+先修标签再打包/启动（普通终端即可，不需要管理员）：
+
+```powershell
+npm run fix:win-integrity
+npm run dist:win
+```
+
+开发模式 `npm run electron:serve` 前也要跑一次 `fix:win-integrity`，否则 `electron.exe` 仍是 Low。
+
+`fix:win-integrity` 只把 `dist_electron` 整棵树、`7za.exe`、`app-builder.exe` 和开发模式用的
+`node_modules\electron\dist\electron.exe` 标成 Medium，不动源码；重新 `npm install` 之后需要再跑一次。
+想一次性恢复整棵树可以用：
+
+```powershell
+icacls "<工程目录>" /setintegritylevel "(OI)(CI)Medium" /T /C
+```
+
 ## iCloud 云端同步
 
 设置页的数据处理中新增「iCloud 同步」，用于把账本备份到 iCloud 云盘，换设备或重装后可从云端恢复。同步完全手动触发，不会自动上传或覆盖数据。

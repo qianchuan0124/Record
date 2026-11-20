@@ -1,7 +1,9 @@
 {
   "name": "record",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "productName": "记账清单",
+  "description": "记账清单：本地 SQLite 记账桌面应用（Electron + Vue 3），支持 iCloud 网盘备份与自动更新",
+  "author": "qianchuan",
   "win": {
     "icon": "public/favicon.ico"
   },
@@ -14,11 +16,14 @@
   },
   "scripts": {
     "lint": "vue-cli-service lint",
-    "electron:serve": "bash scripts/electron-serve.sh",
+    "electron:serve": "node scripts/electron-serve.js",
+    "electron:build": "node scripts/electron-build.js",
     "electron:generate-icons": "electron-icon-builder --input=./public/favicon.png --output=build --flatten",
     "postinstall": "electron-builder install-app-deps",
     "postuninstall": "electron-builder install-app-deps",
-    "dist:mac": "bash scripts/dist-mac.sh"
+    "dist:mac": "bash scripts/dist-mac.sh",
+    "dist:win": "node scripts/electron-build.js --win",
+    "fix:win-integrity": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/fix-win-integrity.ps1"
   },
   "main": "background.js",
   "dependencies": {
