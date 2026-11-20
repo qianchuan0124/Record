@@ -228,21 +228,65 @@ const BASE_COLUMN_WIDTHS = {
 const OPERATION_WIDTH = 112;
 const OPERATION_SPACER = 12;
 const OPERATION_RESERVED = OPERATION_WIDTH + OPERATION_SPACER;
+const MIN_COLUMN_WIDTHS: Record<keyof typeof BASE_COLUMN_WIDTHS, number> = {
+  date: 95,
+  type: 72,
+  base: 84,
+  overtime: 76,
+  oneTime: 80,
+  insurance: 80,
+  bonus: 88,
+  tax: 75,
+  rate: 72,
+  net: 88,
+};
 
 function computeColumnWidths(available: number) {
   const keys = Object.keys(BASE_COLUMN_WIDTHS) as (keyof typeof BASE_COLUMN_WIDTHS)[];
   const baseSum = keys.reduce((sum, key) => sum + BASE_COLUMN_WIDTHS[key], 0);
-  const extra = Math.max(0, available - baseSum - OPERATION_RESERVED);
-  const per = Math.floor(extra / keys.length);
+  const dataAvailable = Math.max(360, available - OPERATION_RESERVED);
   const next = { ...BASE_COLUMN_WIDTHS, operation: OPERATION_WIDTH } as {
     date: number; type: number; base: number; overtime: number; oneTime: number;
     insurance: number; bonus: number; tax: number; rate: number; net: number; operation: number;
   };
-  keys.forEach((key) => {
-    next[key] = BASE_COLUMN_WIDTHS[key] + per;
-  });
-  const used = keys.reduce((sum, key) => sum + next[key], 0) + OPERATION_RESERVED;
-  next.net += available - used;
+
+  if (dataAvailable >= baseSum) {
+    const extra = dataAvailable - baseSum;
+    const per = Math.floor(extra / keys.length);
+    keys.forEach((key) => {
+      next[key] = BASE_COLUMN_WIDTHS[key] + per;
+    });
+  } else {
+    // 最小窗口下按比例收窄列宽，同时保住日期/类型/金额等列的最小可读宽度
+    const scale = dataAvailable / baseSum;
+    keys.forEach((key) => {
+      next[key] = Math.max(MIN_COLUMN_WIDTHS[key], Math.floor(BASE_COLUMN_WIDTHS[key] * scale));
+    });
+  }
+
+  let used = keys.reduce((sum, key) => sum + next[key], 0);
+  // 若按最小宽度仍超出，则从还有余量的列里逐像素回收，保证整表正好铺满
+  while (used > dataAvailable) {
+    let changed = false;
+    for (const key of keys) {
+      if (used <= dataAvailable) {
+        break;
+      }
+      if (next[key] > MIN_COLUMN_WIDTHS[key]) {
+        next[key] -= 1;
+        used -= 1;
+        changed = true;
+      }
+    }
+    if (!changed) {
+      break;
+    }
+  }
+  next.net += dataAvailable - used;
+  // 极端窄屏时宁可横向滚动，也不出现负数列宽
+  if (next.net < 60) {
+    next.net = 60;
+  }
   return next;
 }
 

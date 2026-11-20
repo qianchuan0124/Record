@@ -24,6 +24,7 @@ import {
     getDb,
     reopenDatabase,
     userDataPath,
+    importMobileBackupData,
 } from "@/db/Database";
 import { logError, logInfo } from "./Log";
 
@@ -741,6 +742,145 @@ async function createSnapshotInternal(force: boolean, mode: SnapshotMode): Promi
     return backupResult(manifest, folder, false);
 }
 
+export interface MobileBackupItem {
+    file: string;
+    name: string;
+    created_at: string;
+    created_ts: number;
+    device: string;
+    counts: DataCounts;
+    size: number;
+}
+
+const MOBILE_BACKUP_FILE_RE = /^record-backup-.*\.json$/i;
+const MOBILE_BACKUP_DIR_RE = /^Record备份-/;
+
+function mobileBackupRoots(): string[] {
+    const roots = new Set<string>();
+    const base = baseDir();
+    if (base) {
+        roots.add(path.resolve(base));
+        roots.add(path.resolve(path.dirname(base)));
+    }
+    const folder = syncFolder(false);
+    if (folder) {
+        roots.add(path.resolve(folder));
+    }
+    const desktop = path.join(os.homedir(), "Desktop");
+    if (isDirectory(desktop)) {
+        roots.add(desktop);
+    }
+    return Array.from(roots);
+}
+
+function latestMobileJson(dir: string): string {
+    try {
+        const files = fs.readdirSync(dir)
+            .filter((name) => MOBILE_BACKUP_FILE_RE.test(name))
+            .sort()
+            .reverse();
+        return files.length > 0 ? path.join(dir, files[0]) : "";
+    } catch (error) {
+        return "";
+    }
+}
+
+function mobileBackupFiles(): string[] {
+    const found = new Set<string>();
+    for (const root of mobileBackupRoots()) {
+        if (!isDirectory(root)) {
+            continue;
+        }
+        if (MOBILE_BACKUP_DIR_RE.test(path.basename(root))) {
+            const latest = latestMobileJson(root);
+            if (latest) {
+                found.add(latest);
+            }
+        }
+        try {
+            const entries = fs.readdirSync(root, { withFileTypes: true });
+            for (const entry of entries) {
+                if (entry.isFile() && MOBILE_BACKUP_FILE_RE.test(entry.name)) {
+                    found.add(path.join(root, entry.name));
+                } else if (entry.isDirectory() && MOBILE_BACKUP_DIR_RE.test(entry.name)) {
+                    const latest = latestMobileJson(path.join(root, entry.name));
+                    if (latest) {
+                        found.add(latest);
+                    }
+                }
+            }
+        } catch (error) {
+            continue;
+        }
+    }
+    return Array.from(found);
+}
+
+function readMobileBackup(file: string): MobileBackupItem | null {
+    try {
+        const stat = fs.statSync(file);
+        const raw = fs.readFileSync(file, "utf8");
+        const parsed = JSON.parse(raw);
+        const records = Array.isArray(parsed.records) ? parsed.records : [];
+        const salaries = Array.isArray(parsed.salaries) ? parsed.salaries : [];
+        const bonuses = Array.isArray(parsed.bonuses) ? parsed.bonuses : [];
+        const budgets = Array.isArray(parsed.budgets) ? parsed.budgets : [];
+        const deposits = Array.isArray(parsed.deposits) ? parsed.deposits : [];
+        const categories = Array.isArray(parsed.categories) ? parsed.categories : [];
+        const created = parsed.createdAt ? new Date(parsed.createdAt) : stat.mtime;
+        const createdDate = isNaN(created.getTime()) ? stat.mtime : created;
+        return {
+            file,
+            name: path.basename(file),
+            created_at: formatDateTime(createdDate),
+            created_ts: Math.floor(createdDate.getTime() / 1000),
+            device: String(parsed.device || "移动端"),
+            counts: {
+                record: records.length,
+                salary: salaries.length,
+                bonus: bonuses.length,
+                budget: budgets.length,
+                deposit: deposits.length,
+                category: categories.filter((item: any) => !item || item.isSystem !== true).length,
+            },
+            size: stat.size,
+        };
+    } catch (error) {
+        return null;
+    }
+}
+
+export function listMobileBackups(): MobileBackupItem[] {
+    const items: MobileBackupItem[] = [];
+    for (const file of mobileBackupFiles()) {
+        const item = readMobileBackup(file);
+        if (item) {
+            items.push(item);
+        }
+    }
+    items.sort((left, right) => right.created_ts - left.created_ts);
+    return items;
+}
+
+export function importMobileBackup(file: string): Promise<any> {
+    return enqueueSnapshotTask(async () => {
+        const target = path.resolve(String(file || ""));
+        const allowed = listMobileBackups().some((item) => path.resolve(item.file) === target);
+        if (!allowed) {
+            throw new CloudSyncError("移动端备份文件不存在或不在允许的目录中");
+        }
+        let payload: any;
+        try {
+            payload = JSON.parse(fs.readFileSync(target, "utf8"));
+        } catch (error) {
+            throw new CloudSyncError("移动端备份文件读取失败");
+        }
+        const result = await importMobileBackupData(payload);
+        logInfo("mobile backup imported: " + target);
+        return result;
+    });
+}
+
 export async function listSnapshots(): Promise<CloudSnapshotItem[]> {
     const folder = syncFolder();
     if (!folder || !isDirectory(folder)) {
@@ -1196,6 +1336,22 @@ export function cloudSyncListeners() {
     ipcMain.handle(IpcType.CLOUD_SYNC_SNAPSHOTS, async () => {
         try {
             return ok(await listSnapshots());
+        } catch (error) {
+            return fail(error);
+        }
+    });
+
+    ipcMain.handle(IpcType.CLOUD_SYNC_MOBILE_BACKUPS, async () => {
+        try {
+            return ok(listMobileBackups());
+        } catch (error) {
+            return fail(error);
+        }
+    });
+
+    ipcMain.handle(IpcType.CLOUD_SYNC_IMPORT_MOBILE, async (event, file) => {
+        try {
+            return ok(await importMobileBackup(String(file || "")));
         } catch (error) {
             return fail(error);
         }

@@ -101,6 +101,9 @@
               :type="row.mode === 'auto' ? 'info' : 'primary'">
               {{ row.mode === "auto" ? L10n.auto_backup_tag : L10n.manual_backup_tag }}
             </el-tag>
+            <el-tag v-else-if="row.kind === 'mobile'" size="small" class="mode-tag" type="warning">
+              {{ L10n.mobile_backup_tag }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column :label="L10n.device" width="136">
@@ -163,7 +166,7 @@
       <el-alert
         class="sync-alert"
         :title="actionTip"
-        :type="selectedVersion && selectedVersion.kind === 'cloud' ? 'warning' : 'info'"
+        :type="selectedVersion && selectedVersion.kind !== 'local' ? 'warning' : 'info'"
         :closable="false"
         show-icon />
       <template #footer>
@@ -194,17 +197,20 @@ import {
   CloudSnapshot,
   CloudSyncStatus,
   DataCounts,
+  MobileBackupItem,
   backupToCloud,
   chooseCloudSyncDir,
   fetchCloudSnapshots,
   fetchCloudSyncStatus,
+  fetchMobileBackups,
   formatSize,
+  importMobileBackup,
   openCloudSyncDir,
   restoreCloudSnapshot,
   updateCloudSyncSettings,
 } from "./CloudSyncManager";
 
-type SyncVersionKind = "local" | "cloud";
+type SyncVersionKind = "local" | "cloud" | "mobile";
 
 interface SyncVersion {
   key: string;
@@ -212,12 +218,14 @@ interface SyncVersion {
   mode?: "manual" | "auto";
   counts?: DataCounts | null;
   created_at: string;
+  created_ts: number;
   device_label: string;
   record_count: number;
   size: number;
   downloaded: boolean;
   is_latest: boolean;
   snapshot: string;
+  file?: string;
 }
 
 const status = ref<CloudSyncStatus | null>(null);
@@ -246,12 +254,18 @@ const actionText = computed(() => {
   if (selectedVersion.value && selectedVersion.value.kind === "cloud") {
     return L10n.sync_to_local;
   }
+  if (selectedVersion.value && selectedVersion.value.kind === "mobile") {
+    return L10n.import_mobile_backup;
+  }
   return L10n.sync_to_cloud;
 });
 
 const actionTip = computed(() => {
   if (selectedVersion.value && selectedVersion.value.kind === "cloud") {
     return L10n.sync_to_local_tip;
+  }
+  if (selectedVersion.value && selectedVersion.value.kind === "mobile") {
+    return L10n.import_mobile_tip;
   }
   return L10n.sync_to_cloud_tip;
 });
@@ -261,7 +275,7 @@ const canSync = computed(() => {
   if (!version) {
     return false;
   }
-  return version.kind === "local" || version.downloaded;
+  return version.kind !== "cloud" || version.downloaded;
 });
 
 async function refresh() {
@@ -277,6 +291,7 @@ function localVersion(): SyncVersion {
     key: "local",
     kind: "local",
     created_at: "",
+    created_ts: 0,
     device_label: L10n.this_device,
     record_count: status.value ? status.value.record_count : 0,
     size: status.value ? status.value.local_size : 0,
@@ -292,6 +307,7 @@ function toVersion(item: CloudSnapshot): SyncVersion {
     key: item.snapshot,
     kind: "cloud",
     created_at: item.created_at,
+    created_ts: item.created_ts,
     device_label: item.is_mine ? L10n.this_device : item.device_label,
     record_count: item.record_count,
     size: item.size,
@@ -300,6 +316,23 @@ function toVersion(item: CloudSnapshot): SyncVersion {
     mode: item.mode,
     counts: item.counts,
     snapshot: item.snapshot,
+  };
+}
+
+function toMobileVersion(item: MobileBackupItem): SyncVersion {
+  return {
+    key: `mobile:${item.file}`,
+    kind: "mobile",
+    created_at: item.created_at,
+    created_ts: item.created_ts,
+    device_label: item.device,
+    record_count: item.counts.record,
+    size: item.size,
+    downloaded: true,
+    is_latest: false,
+    counts: item.counts,
+    snapshot: "",
+    file: item.file,
   };
 }
 
@@ -330,8 +363,13 @@ async function openSync() {
   selectedVersion.value = local;
   versions.value = [local];
   try {
-    const snapshots = await fetchCloudSnapshots();
-    const list = [localVersion(), ...snapshots.map(toVersion)];
+    const [snapshots, mobileBackups] = await Promise.all([
+      fetchCloudSnapshots(),
+      fetchMobileBackups(),
+    ]);
+    const remote = [...snapshots.map(toVersion), ...mobileBackups.map(toMobileVersion)]
+      .sort((left, right) => right.created_ts - left.created_ts);
+    const list = [localVersion(), ...remote];
     versions.value = list;
     selectedVersion.value = list[0];
   } catch (error) {
@@ -375,6 +413,18 @@ async function confirmSync() {
       } else {
         ElMessage.success(L10n.backup_success);
       }
+    } else if (version.kind === "mobile") {
+      if (!version.file) {
+        throw new Error(L10n.mobile_backup_missing);
+      }
+      const result = await importMobileBackup(version.file);
+      syncVisible.value = false;
+      ElMessage.success({
+        message: `${L10n.mobile_import_success}：${L10n.record_count} ${result.records} · ${L10n.salary} ${result.salaries} · ${L10n.deposit} ${result.deposits}`,
+        duration: 5000,
+      });
+      notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
+      updateCurrentCategory();
     } else {
       const result = await restoreCloudSnapshot(version.snapshot);
       syncVisible.value = false;

@@ -275,5 +275,10 @@
   "bonus_added": "年终奖已添加",
   "bonus_updated": "年终奖已更新",
   "bonus_deleted": "年终奖已删除",
-  "budget_saved": "预算已保存"
+  "budget_saved": "预算已保存",
+  "mobile_backup_tag": "移动端",
+  "import_mobile_backup": "导入移动端备份",
+  "import_mobile_tip": "会把移动端备份合并到本机，按内容自动去重，本机已有数据不会被删除。",
+  "mobile_import_success": "移动端数据已导入",
+  "mobile_backup_missing": "移动端备份文件不存在"
 }

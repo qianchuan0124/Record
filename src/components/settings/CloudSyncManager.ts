@@ -40,6 +40,16 @@ export interface CloudSyncManifest {
   custom_category: boolean;
 }
 
+export interface MobileBackupItem {
+  file: string;
+  name: string;
+  created_at: string;
+  created_ts: number;
+  device: string;
+  counts: DataCounts;
+  size: number;
+}
+
 export interface CloudSyncStatus {
   platform: string;
   autoBackup: boolean;
@@ -97,6 +107,14 @@ export function backupToCloud(force = false): Promise<CloudBackupResult> {
 
 export function fetchCloudSnapshots(): Promise<CloudSnapshot[]> {
   return invoke<CloudSnapshot[]>(IpcType.CLOUD_SYNC_SNAPSHOTS);
+}
+
+export function fetchMobileBackups(): Promise<MobileBackupItem[]> {
+  return invoke<MobileBackupItem[]>(IpcType.CLOUD_SYNC_MOBILE_BACKUPS);
+}
+
+export function importMobileBackup(file: string): Promise<any> {
+  return invoke<any>(IpcType.CLOUD_SYNC_IMPORT_MOBILE, file);
 }
 
 export function restoreCloudSnapshot(snapshot: string): Promise<CloudRestoreResult> {

@@ -6,6 +6,7 @@ import { Record } from "@/models/Record";
 import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from "@/models/Payroll";
 import { DepositBank, DepositData, DepositRecord } from "@/models/Deposit";
 import { presetByName } from "@/configs/BankPresets";
+import CategoryData from "@/configs/Category.json";
 import { calcSalaryTax } from "@/utils/PayrollTax";
 import { IpcResponse, IpcType } from "@/models/IpcResponse";
 import fs from "fs/promises";
@@ -1685,6 +1686,263 @@ async function fetchBudgetExpense(start: number, end: number): Promise<number> {
         [start, end]
     ) as { total: number };
     return Number((row as { total: number }).total) || 0;
+}
+
+export interface MobileBackupImportResult {
+    records: number;
+    salaries: number;
+    bonuses: number;
+    budgets: number;
+    deposits: number;
+    categories: number;
+}
+
+function mobileNumber(value: unknown): number {
+    const result = Number(value);
+    return isNaN(result) ? 0 : result;
+}
+
+function mobileDate(value: unknown): number {
+    const date = new Date(value as string | number);
+    if (isNaN(date.getTime())) {
+        return 0;
+    }
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+}
+
+async function importMobileCategories(items: any[]): Promise<number> {
+    if (items.length === 0) {
+        return 0;
+    }
+    let categories: any[] = [];
+    try {
+        const raw = await fs.readFile(customCategoryPath, "utf8");
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            categories = parsed;
+        }
+    } catch (error) {
+        categories = JSON.parse(JSON.stringify((CategoryData as any).default || []));
+    }
+    if (categories.length === 0) {
+        categories = JSON.parse(JSON.stringify((CategoryData as any).default || []));
+    }
+
+    let added = 0;
+    for (const item of items) {
+        const name = String(item && item.name ? item.name : "").trim();
+        if (!name) {
+            continue;
+        }
+        const parentName = String(item && item.parentName ? item.parentName : "").trim();
+        if (parentName) {
+            let parent = categories.find((node) => String(node.label) === parentName);
+            if (!parent) {
+                parent = { label: parentName, value: parentName, children: [] };
+                categories.push(parent);
+            }
+            if (!Array.isArray(parent.children)) {
+                parent.children = [];
+            }
+            if (!parent.children.some((child: any) => String(child.label) === name)) {
+                parent.children.push({ label: name, value: name });
+                added += 1;
+            }
+        } else if (!categories.some((node) => String(node.label) === name)) {
+            categories.push({ label: name, value: name, children: [] });
+            added += 1;
+        }
+    }
+    if (added > 0) {
+        await saveCustomCategory(JSON.stringify(categories));
+    }
+    return added;
+}
+
+/**
+ * 合并导入移动端的 record-backup-*.json：
+ * 流水按内容去重，工资/年终奖/预算复用 importPayroll，存款和自定义银行按内容去重，自定义分类合并。
+ */
+export async function importMobileBackupData(payload: any): Promise<MobileBackupImportResult> {
+    const result: MobileBackupImportResult = {
+        records: 0,
+        salaries: 0,
+        bonuses: 0,
+        budgets: 0,
+        deposits: 0,
+        categories: 0,
+    };
+
+    const records = Array.isArray(payload && payload.records) ? payload.records : [];
+    for (const item of records) {
+        const date = mobileDate(item && item.date);
+        const rawType = item && item.typeRaw ? String(item.typeRaw) : "";
+        const type = rawType === "income" || rawType === "收入" ? "收入"
+            : rawType === "expense" || rawType === "支出" ? "支出" : "";
+        const category = String(item && item.category ? item.category : "");
+        const subCategory = String(item && item.subCategory ? item.subCategory : "");
+        const amount = mobileNumber(item && item.amount);
+        const remark = String(item && item.remark ? item.remark : "");
+        if (!date || !type || !category || !subCategory || !amount) {
+            continue;
+        }
+        const exists = await dbGet(
+            "SELECT id FROM record WHERE isDeleted = 0 AND date = ? AND type = ? AND category = ? AND subCategory = ? AND amount = ? AND remark = ?",
+            [date, type, category, subCategory, amount, remark]
+        );
+        if (exists) {
+            continue;
+        }
+        await createRecord({
+            id: 0,
+            date: new Date(date),
+            amount,
+            type,
+            category,
+            subCategory,
+            remark,
+            isDeleted: false,
+            syncId: 0,
+            countInBudget: item && item.countInBudget === false ? 0 : 1,
+        });
+        result.records += 1;
+    }
+
+    const salaryItems = Array.isArray(payload && payload.salaries) ? payload.salaries : [];
+    const salaryRows: SalaryRecord[] = [];
+    for (const item of salaryItems) {
+        const date = mobileDate(item && item.date);
+        if (!date) {
+            continue;
+        }
+        const baseSalary = mobileNumber(item && item.baseSalary);
+        const overtimePay = mobileNumber(item && item.overtimePay);
+        const oneTimeBonus = mobileNumber(item && item.oneTimeBonus);
+        const socialInsurance = mobileNumber(item && item.socialInsurance);
+        const tax = mobileNumber(item && item.tax);
+        salaryRows.push({
+            id: 0,
+            date,
+            baseSalary,
+            overtimePay,
+            oneTimeBonus,
+            socialInsurance,
+            tax,
+            taxRate: mobileNumber(item && item.taxRate),
+            netPay: Math.round((baseSalary + overtimePay + oneTimeBonus - socialInsurance - tax) * 100) / 100,
+            taxManual: 1,
+        });
+    }
+
+    const bonusItems = Array.isArray(payload && payload.bonuses) ? payload.bonuses : [];
+    const bonusRows: AnnualBonus[] = [];
+    for (const item of bonusItems) {
+        const date = mobileDate(item && item.date);
+        if (!date) {
+            continue;
+        }
+        const bonus = mobileNumber(item && item.bonus);
+        const tax = mobileNumber(item && item.tax);
+        bonusRows.push({
+            id: 0,
+            date,
+            bonus,
+            tax,
+            taxRate: mobileNumber(item && item.taxRate),
+            netPay: Math.round((bonus - tax) * 100) / 100,
+        });
+    }
+
+    const budgetItems = Array.isArray(payload && payload.budgets) ? payload.budgets : [];
+    const budgetRows: BudgetItem[] = budgetItems
+        .map((item: any) => ({
+            id: 0,
+            name: String(item && item.name ? item.name : "").trim(),
+            amount: mobileNumber(item && item.amount),
+        }))
+        .filter((item: BudgetItem) => !!item.name);
+
+    const payrollResult = await importPayroll({
+        salaries: salaryRows,
+        bonuses: bonusRows,
+        budgets: budgetRows,
+    });
+    result.salaries = payrollResult.insertedSalaries;
+    result.bonuses = payrollResult.insertedBonuses;
+    result.budgets = payrollResult.insertedBudgets;
+
+    const depositItems = Array.isArray(payload && payload.deposits) ? payload.deposits : [];
+    for (const item of depositItems) {
+        const bankName = String(item && item.bankName ? item.bankName : "").trim();
+        const startDate = mobileDate(item && item.startDate);
+        const amount = mobileNumber(item && item.amount);
+        const years = mobileNumber(item && item.years);
+        const rate = mobileNumber(item && item.rate);
+        if (!bankName || !startDate || !amount) {
+            continue;
+        }
+        let bankKey = "";
+        const preset = presetByName(bankName);
+        if (preset) {
+            bankKey = `b:${preset.icon}`;
+        } else {
+            const existingBank = await dbGet(
+                "SELECT id FROM deposit_bank WHERE isDeleted = 0 AND name = ?",
+                [bankName]
+            ) as { id: number } | undefined;
+            if (existingBank) {
+                bankKey = `c:${existingBank.id}`;
+            } else {
+                const bankId = await new Promise<number>((resolve, reject) => {
+                    db.run(
+                        "INSERT INTO deposit_bank (name, icon) VALUES (?, ?)",
+                        [bankName, ""],
+                        function (err) {
+                            if (err) {
+                                reject(new Error(ErrorType.DATA_BASE_ERROR));
+                            } else {
+                                resolve(this.lastID);
+                            }
+                        }
+                    );
+                });
+                bankKey = `c:${bankId}`;
+            }
+        }
+        const exists = await dbGet(
+            "SELECT id FROM deposit_record WHERE isDeleted = 0 AND bankKey = ? AND startDate = ? AND amount = ? AND years = ? AND rate = ?",
+            [bankKey, startDate, amount, years, rate]
+        );
+        if (exists) {
+            continue;
+        }
+        await new Promise<void>((resolve, reject) => {
+            db.run(
+                `INSERT INTO deposit_record
+                 (bankId, bankKey, startDate, amount, years, rate, interest, sortOrder)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    0,
+                    bankKey,
+                    startDate,
+                    amount,
+                    years,
+                    rate,
+                    mobileNumber(item && item.interest),
+                    mobileNumber(item && item.order) + 1,
+                ],
+                (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+            );
+        });
+        result.deposits += 1;
+    }
+
+    const categoryItems = Array.isArray(payload && payload.categories)
+        ? payload.categories.filter((item: any) => item && item.isSystem !== true)
+        : [];
+    result.categories = await importMobileCategories(categoryItems);
+    return result;
 }
 
 export async function importPayroll(payload: { salaries?: SalaryRecord[]; bonuses?: AnnualBonus[]; budgets?: BudgetItem[] }) {
