@@ -30,3 +30,6 @@ pnpm-debug.log*
 
 # 打包脚本安装的 Python 依赖目录
 packaging/.venv
+
+# 本地临时工作目录（数据导入/排查用的脚本与备份）
+/_work
