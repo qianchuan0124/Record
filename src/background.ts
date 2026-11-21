@@ -1,5 +1,7 @@
 'use strict'
 
+// 必须放在所有业务 import 之前：先确定 userData 目录，Database/CloudSync 才会读到正确的路径
+import './utils/UserDataPath'
 import { app, protocol, BrowserWindow, screen, Menu } from 'electron'
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import installExtension, { VUEJS3_DEVTOOLS } from 'electron-devtools-installer'
@@ -36,8 +38,9 @@ if (!gotTheLock) {
 
 function defaultSize(): { height: number, width: number } {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
-  const resultWidth = Math.max(1200, Math.min(width * 0.8, 1500))
-  const resultHeight = Math.max(700, Math.min(height * 0.8, 1000))
+  // 默认占工作区 85%，并保证不超过当前屏幕；大屏最多 1500×1000，小屏最低 960×600
+  const resultWidth = Math.min(width, Math.min(1500, Math.max(960, Math.round(width * 0.85))))
+  const resultHeight = Math.min(height, Math.min(1000, Math.max(600, Math.round(height * 0.85))))
 
   return { height: resultHeight, width: resultWidth }
 }
@@ -48,8 +51,8 @@ async function createWindow() {
   const win = new BrowserWindow({
     width: defaultSize().width,
     height: defaultSize().height,
-    minWidth: 1200,
-    minHeight: 700,
+    minWidth: 960,
+    minHeight: 600,
     icon: path.join(app.getAppPath(), 'public/favicon.ico'),
     webPreferences: {
 

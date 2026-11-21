@@ -4,13 +4,13 @@
     <div class="record-title">
       <el-row>
         <el-col :span="2"></el-col>
-        <el-col :span="3" class="record-title-item align-left">{{ L10n.category }}</el-col>
+        <el-col :span="4" class="record-title-item align-left">{{ L10n.category }}</el-col>
         <el-col :span="2"></el-col>
         <el-col :span="3" class="record-title-item align-left">{{ L10n.type }}</el-col>
         <el-col :span="2"></el-col>
         <el-col :span="3" class="record-title-item align-right">{{ L10n.amount }}</el-col>
         <el-col :span="2"></el-col>
-        <el-col :span="7" class="record-title-item align-left">{{ L10n.remark }}</el-col>
+        <el-col :span="6" class="record-title-item align-left">{{ L10n.remark }}</el-col>
       </el-row>
     </div>
 
@@ -59,8 +59,8 @@
                   :class="{ 'is-selected': selectedRecord?.id === record.id }"
                   @click="onTapCell(record)">
                   <el-col :span="2"></el-col>
-                  <el-col :span="3" class="record-item align-left">
-                    <div class="record-category-item">
+                  <el-col :span="4" class="record-item align-left">
+                    <div class="record-category-item" :title="record.subCategory">
                       <img
                         :src="
                           require(`@/assets/category/${findCategoryIconByValue(
@@ -85,7 +85,7 @@
                       :keyword="currentFilter.keyword"></HightlightSpan>
                   </el-col>
                   <el-col :span="2" class="record-item"></el-col>
-                  <el-col :span="7" class="record-item align-left">
+                  <el-col :span="6" class="record-item align-left">
                     <HightlightSpan
                       :content="record.remark"
                       :keyword="currentFilter.keyword"></HightlightSpan>

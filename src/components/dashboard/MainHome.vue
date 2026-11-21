@@ -76,4 +76,11 @@ function handleFilterChanged(filter: Filter) {
   min-width: 0;
   min-height: 0;
 }
+
+@media (max-width: 1120px) {
+  .month-select-container {
+    flex: 0 0 180px;
+    width: 180px;
+  }
+}
 </style>

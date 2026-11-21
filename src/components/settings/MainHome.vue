@@ -51,6 +51,8 @@
         </section>
       </div>
 
+      <div class="settings-bottom-space"></div>
+
       <el-dialog
         v-model="feedbackVisible"
         :title="L10n.update_and_feedback"
@@ -229,8 +231,9 @@ onDeactivated(() => {
 <style scoped>
 .container {
   height: 100%;
-  padding: 16px 24px 24px 16px;
-  overflow: hidden;
+  padding: 16px 24px 0 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .page {
@@ -294,10 +297,17 @@ onDeactivated(() => {
 
 .settings-grid {
   display: flex;
-  flex: 1;
+  /* 高度由两侧内容中较高的一侧决定：左右卡片底边始终对齐，内容超出时整页滚动 */
+  flex: 1 0 auto;
   gap: 16px;
   align-items: stretch;
   min-height: 0;
+}
+
+/* 放在 page 里的固定高度占位，保证无论是否滚动到底都有底部间距 */
+.settings-bottom-space {
+  flex: 0 0 40px;
+  height: 40px;
 }
 
 .column-left {
@@ -307,11 +317,13 @@ onDeactivated(() => {
   gap: 16px;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  /* 宽而矮的窗口下内容会超出左栏，交给页面容器滚动，不要裁掉 */
+  overflow: visible;
 }
 
+/* 只允许拉伸，不允许压到内容高度以下，避免数据处理内容盖到 iCloud 卡片上 */
 .column-left .settings-card:first-child {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 0;
 }
 
@@ -440,4 +452,29 @@ onDeactivated(() => {
 .inner-info-url {
   margin: 0 4px;
 }
+
+/* 小屏：左右两栏改为单栏堆叠，页面整体滚动 */
+@media (max-width: 1120px) {
+  .page-header {
+    flex-wrap: wrap;
+  }
+
+  .settings-grid {
+    flex-direction: column;
+  }
+
+  .column-left {
+    flex: none;
+    width: 100%;
+  }
+
+  .column-left .settings-card:first-child {
+    flex: none;
+  }
+
+  .category-card {
+    flex: none;
+  }
+}
+
 </style>

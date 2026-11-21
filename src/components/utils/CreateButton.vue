@@ -450,7 +450,7 @@ input[type="number"] {
 }
 
 /* 窄窗口下标签换到控件上方，避免栅格列太窄把值截断 */
-@media (max-width: 1023px) {
+@media (max-width: 1180px) {
   .button-style {
     flex-direction: column;
     align-items: stretch;

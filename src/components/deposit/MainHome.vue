@@ -707,4 +707,34 @@ onUnmounted(() => {
   border-radius: 20px;
   box-shadow: 0 6px 16px rgba(27, 31, 39, 0.08);
 }
+
+/* 小屏：压缩列宽并禁止换行，保证表头/内容单行 */
+@media (max-width: 1120px) {
+  .deposit-head,
+  .deposit-row {
+    grid-template-columns: 30px minmax(110px, 1fr) 86px 88px 52px 88px 58px 72px 10px 96px;
+    column-gap: 6px;
+    padding-left: 8px;
+    font-size: 12px;
+  }
+
+  .deposit-head {
+    height: 34px;
+    padding-right: 6px;
+  }
+
+  .deposit-row {
+    height: 48px;
+  }
+
+  .deposit-head span,
+  .deposit-row > span {
+    white-space: nowrap;
+  }
+
+  .row-actions :deep(.el-button) {
+    padding: 0 4px;
+  }
+}
+
 </style>

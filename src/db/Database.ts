@@ -887,6 +887,94 @@ async function updateRecord(record: Record, addSyncId: Boolean): Promise<number>
     return row;
 }
 
+// 收入分析里把薪酬（工资/年终奖的到手金额）作为一类单独展示，
+// 否则只统计 record 表时，只有工资收入的用户切到「收入」会是一片空白。
+const PAYROLL_CATEGORY = "薪酬";
+
+async function payrollIncomeTotal(year: number): Promise<number> {
+    const start = new Date(year, 0, 1).getTime();
+    const end = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
+    const row = await dbGet(
+        `SELECT ROUND(
+            IFNULL((SELECT SUM(netPay) FROM salary_record WHERE isDeleted = 0 AND date >= ? AND date <= ?), 0) +
+            IFNULL((SELECT SUM(netPay) FROM annual_bonus WHERE isDeleted = 0 AND date >= ? AND date <= ?), 0)
+        , 2) AS total`,
+        [start, end, start, end]
+    ) as { total: number };
+    return Number((row && row.total) || 0);
+}
+
+async function getPayrollYearlyCategory(year: number) {
+    const start = new Date(year, 0, 1).getTime();
+    const end = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
+    const salaries = await dbAll(
+        "SELECT * FROM salary_record WHERE isDeleted = 0 AND date >= ? AND date <= ? ORDER BY date ASC",
+        [start, end]
+    ) as SalaryRecord[];
+    const bonuses = await dbAll(
+        "SELECT * FROM annual_bonus WHERE isDeleted = 0 AND date >= ? AND date <= ? ORDER BY date ASC",
+        [start, end]
+    ) as AnnualBonus[];
+
+    type Bucket = { subCategory: string; total: number; records: Record[] };
+    const months = Array.from({ length: 12 }, (_, index) => ({
+        month: index + 1,
+        total: 0,
+        buckets: new Map<string, Bucket>(),
+    }));
+
+    const incomeRecord = (id: number, date: number, subCategory: string, amount: number): Record => ({
+        id,
+        amount,
+        type: "收入",
+        date: new Date(date),
+        category: PAYROLL_CATEGORY,
+        subCategory,
+        remark: subCategory,
+        isDeleted: false,
+        syncId: 0,
+        countInBudget: 1,
+    });
+
+    for (const salary of salaries) {
+        const date = Number(salary.date);
+        const month = new Date(date).getMonth();
+        const amount = Number(salary.netPay) || 0;
+        const bucket = months[month].buckets.get("工资") || { subCategory: "工资", total: 0, records: [] };
+        bucket.total = Math.round((bucket.total + amount) * 100) / 100;
+        bucket.records.push(incomeRecord(1000000 + salary.id, date, "工资", amount));
+        months[month].buckets.set("工资", bucket);
+        months[month].total = Math.round((months[month].total + amount) * 100) / 100;
+    }
+
+    for (const bonus of bonuses) {
+        const date = Number(bonus.date);
+        const month = new Date(date).getMonth();
+        const amount = Number(bonus.netPay) || 0;
+        const bucket = months[month].buckets.get("年终奖") || { subCategory: "年终奖", total: 0, records: [] };
+        bucket.total = Math.round((bucket.total + amount) * 100) / 100;
+        bucket.records.push(incomeRecord(2000000 + bonus.id, date, "年终奖", amount));
+        months[month].buckets.set("年终奖", bucket);
+        months[month].total = Math.round((months[month].total + amount) * 100) / 100;
+    }
+
+    const monthList = months.map((item) => ({
+        month: item.month,
+        total: item.total,
+        subCategory: Array.from(item.buckets.values()).map((bucket) => ({
+            ...bucket,
+            records: bucket.records.sort((a, b) => Number(b.amount) - Number(a.amount)),
+        })),
+    }));
+
+    return {
+        year,
+        category: PAYROLL_CATEGORY,
+        total: monthList.reduce((sum, item) => sum + item.total, 0),
+        months: monthList,
+    };
+}
+
 async function yearlyData(years: number[], recordType: "支出" | "收入" = "支出") {
     try {
         const queries = years.map((year) => {
@@ -909,7 +997,15 @@ async function yearlyData(years: number[], recordType: "支出" | "收入" = "�
             });
         });
 
-        const result = await Promise.all(queries);
+        const result = await Promise.all(queries) as { year: number; items: { category: string; total: number }[] }[];
+        if (recordType === "收入") {
+            await Promise.all(result.map(async (item) => {
+                const total = await payrollIncomeTotal(Number(item.year));
+                if (total > 0) {
+                    item.items.push({ category: PAYROLL_CATEGORY, total });
+                }
+            }));
+        }
         return result;
     } catch (error) {
         throw new Error(ErrorType.DATA_BASE_ERROR); // 抛出具体的错误类型
@@ -981,10 +1077,21 @@ async function getYearlyTotalInfo(year: number, recordType: "支出" | "收入" 
         WHERE date >= ? AND date <= ? AND isDeleted = 0 AND type = ? 
         GROUP BY category
     `;
-    return await dbAll(sql, [start, end, recordType]) as { category: string; total: number }[];
+    const rows = await dbAll(sql, [start, end, recordType]) as { category: string; total: number }[];
+    if (recordType === "收入") {
+        const payrollTotal = await payrollIncomeTotal(year);
+        if (payrollTotal > 0) {
+            rows.push({ category: PAYROLL_CATEGORY, total: payrollTotal });
+        }
+    }
+    return rows;
 }
 
 async function getTopSubCategoryByYear(year: number, category: string, recordType: "支出" | "收入" = "支出") {
+    if (recordType === "收入" && category === PAYROLL_CATEGORY) {
+        return await getPayrollYearlyCategory(year);
+    }
+
     // 封装数据库查询函数
     async function queryDb(sql: string, params: any[]) {
         return dbAll(sql, params);

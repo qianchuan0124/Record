@@ -23,7 +23,16 @@ export async function fetchYearlyAnalysis(yearsData: string[], recordType: "支�
     try {
         const data = await fetchYearlyData(yearsData, recordType);
         const Category = getCategories();
-        const categories = Category.map((item: any) => item.label);
+        const configured = Category.map((item: any) => item.label);
+        // 收入可能来自薪酬等非支出分类，按实际出现的分类生成系列，
+        // 避免只按支出分类建系列时收入模式没有可显示的柱子。
+        let categories = configured;
+        if (recordType === "收入") {
+            const present = new Set<string>();
+            data.forEach((item) => item.items.forEach((categoryItem) => present.add(categoryItem.category)));
+            const extra = Array.from(present).filter((category) => !configured.includes(category));
+            categories = [...extra, ...configured.filter((category) => present.has(category))];
+        }
         // 生成年度分析数据
         return categories.map((category: string) => ({
             name: category,

@@ -5,11 +5,11 @@
       <div class="total-text">
         <div class="total-item">
           <span class="total-label">{{ L10n.income }}</span>
-          <span class="income-span">{{ allIncome }}</span>
+          <span class="income-span" :title="allIncome">{{ allIncome }}</span>
         </div>
         <div class="total-item">
           <span class="total-label">{{ L10n.expense }}</span>
-          <span class="expend-span">{{ allExpend }}</span>
+          <span class="expend-span" :title="allExpend">{{ allExpend }}</span>
         </div>
       </div>
     </div>
@@ -365,4 +365,42 @@ onDeactivated(() => {
 }
 
 
+
+/* 小屏：压缩总览卡和创建按钮，给中间输入区留更多空间 */
+@media (max-width: 1120px) {
+  .create-table {
+    padding: 12px 14px;
+  }
+
+  .total-container {
+    flex: 0 0 210px;
+    gap: 8px;
+    padding-right: 14px;
+  }
+
+  .all-account-img {
+    width: 40px;
+    height: 60px;
+  }
+
+  .income-span,
+  .expend-span {
+    font-size: 15px;
+  }
+
+  .action-container {
+    gap: 12px;
+    padding-left: 14px;
+  }
+
+  .create-primary {
+    width: 96px;
+    font-size: 17px;
+    letter-spacing: 2px;
+  }
+
+  .create-icon {
+    font-size: 22px;
+  }
+}
 </style>

@@ -2,7 +2,11 @@
   <div class="cloud-sync">
     <div class="folder-line" v-if="status && status.folder">
       <span class="folder-label">{{ L10n.sync_dir }}</span>
-      <el-link type="primary" :underline="false" @click="openFolder">
+      <el-link
+        type="primary"
+        :underline="false"
+        :title="status.folder"
+        @click="openFolder">
         {{ shortFolder }}
       </el-link>
     </div>
@@ -247,7 +251,7 @@ const shortFolder = computed(() => {
     return "";
   }
   const parts = folder.split(/[\\/]/).filter((item) => !!item);
-  return parts.length > 3 ? `.../${parts.slice(-3).join("/")}` : folder;
+  return parts.length > 2 ? `.../${parts.slice(-2).join("/")}` : folder;
 });
 
 const actionText = computed(() => {

@@ -1,44 +1,44 @@
 <template>
-  <el-tabs :tab-position="tabPosition" class="app-tabs">
-    <el-tab-pane>
+  <el-tabs v-model="activeTab" :tab-position="tabPosition" class="app-tabs">
+    <el-tab-pane name="dashboard">
       <template #label>
-        <span class="custom-tabs-label">
+        <span class="custom-tabs-label" :title="L10n.dashboard">
           <el-icon class="panel_icon"><Grid /></el-icon>
           <span class="panel_title">{{ L10n.dashboard }}</span>
         </span>
       </template>
       <DashboardHome></DashboardHome>
     </el-tab-pane>
-    <el-tab-pane>
+    <el-tab-pane name="payroll">
       <template #label>
-        <span class="custom-tabs-label">
+        <span class="custom-tabs-label" :title="L10n.payroll">
           <el-icon class="panel_icon"><Wallet /></el-icon>
           <span class="panel_title">{{ L10n.payroll }}</span>
         </span>
       </template>
-      <PayrollHome></PayrollHome>
+      <PayrollHome :active="activeTab === 'payroll'"></PayrollHome>
     </el-tab-pane>
-    <el-tab-pane>
+    <el-tab-pane name="deposit">
       <template #label>
-        <span class="custom-tabs-label">
+        <span class="custom-tabs-label" :title="L10n.deposit">
           <el-icon class="panel_icon"><Coin /></el-icon>
           <span class="panel_title">{{ L10n.deposit }}</span>
         </span>
       </template>
       <DepositHome></DepositHome>
     </el-tab-pane>
-    <el-tab-pane>
+    <el-tab-pane name="analysis">
       <template #label>
-        <span class="custom-tabs-label">
+        <span class="custom-tabs-label" :title="L10n.analysis">
           <el-icon class="panel_icon"><PieChart /></el-icon>
           <span class="panel_title">{{ L10n.analysis }}</span>
         </span>
       </template>
       <AnalysisHome></AnalysisHome>
     </el-tab-pane>
-    <el-tab-pane>
+    <el-tab-pane name="settings">
       <template #label>
-        <span class="custom-tabs-label">
+        <span class="custom-tabs-label" :title="L10n.settings">
           <el-icon class="panel_icon"><Setting /></el-icon>
           <span class="panel_title">{{ L10n.settings }}</span>
         </span>
@@ -64,6 +64,9 @@ import DepositHome from "./deposit/MainHome.vue";
 import SettingHome from "./settings/MainHome.vue";
 
 const tabPosition = ref<TabsInstance["tabPosition"]>("left");
+// 页签内容用 v-show 隐藏，组件不会重新挂载；把当前页签传给薪酬页，
+// 让它在自己被切到时立刻按真实宽度收口，避免切换后列宽再跳一次。
+const activeTab = ref("dashboard");
 
 let unsubscribeCloud: (() => void) | null = null;
 
@@ -177,5 +180,33 @@ onUnmounted(() => {
 
 .panel_title {
   color: inherit;
+}
+
+/* 小屏：侧栏收成图标栏，内容和标题提示仍在；大屏保持原样 */
+@media (max-width: 1120px) {
+  .app-tabs > :deep(.el-tabs__header) {
+    width: 64px;
+    margin: 16px 0 16px 12px;
+    padding: 6px;
+  }
+
+  .app-tabs > :deep(.el-tabs__header) .el-tabs__item {
+    justify-content: center;
+    padding: 0 !important;
+  }
+
+  .custom-tabs-label {
+    justify-content: center;
+    gap: 0;
+  }
+
+  .panel_icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .panel_title {
+    display: none;
+  }
 }
 </style>

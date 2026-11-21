@@ -19,6 +19,7 @@
 
     <div class="table-card" v-loading="loading" ref="tableCard">
       <el-table
+        ref="tableRef"
         :data="tableRows"
         size="small"
         height="100%"
@@ -69,7 +70,11 @@
         <el-table-column :label="L10n.tax" :width="columnWidths.tax" align="right">
           <template #default="{ row }"><span class="money-negative">{{ money(row.tax) }}</span></template>
         </el-table-column>
-        <el-table-column :label="L10n.tax_rate" :width="columnWidths.rate" align="right">
+        <el-table-column
+          v-if="showTaxRate"
+          :label="L10n.tax_rate"
+          :width="columnWidths.rate"
+          align="right">
           <template #default="{ row }">
             <span class="tax-rate" :class="taxRateClass(row.taxRate)">{{ percent(row.taxRate) }}</span>
           </template>
@@ -174,9 +179,10 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onActivated, onMounted, onUnmounted, ref } from "vue";
+import { computed, defineProps, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { Plus, Setting } from "@element-plus/icons-vue";
+import type { TableInstance } from "element-plus";
 import L10n from "@/configs/L10n.json";
 import { AnnualBonus, BudgetItem, SalaryRecord } from "@/models/Payroll";
 import {
@@ -192,6 +198,12 @@ import { applyPayrollCache, payrollCache, payrollDataChanged } from "./PayrollSt
 import SalaryDialog from "./SalaryDialog.vue";
 import BonusDialog from "./BonusDialog.vue";
 import BudgetDrawer from "./BudgetDrawer.vue";
+
+// 由外层页签控制当前是否可见：el-tabs 用 v-show 隐藏页签，组件不会重新挂载，
+// 只有通过 active 才能知道“切到薪酬页”的准确时机。
+const props = defineProps({
+  active: { type: Boolean, default: false },
+});
 
 interface PayrollRow {
   key: string;
@@ -241,8 +253,23 @@ const MIN_COLUMN_WIDTHS: Record<keyof typeof BASE_COLUMN_WIDTHS, number> = {
   net: 88,
 };
 
+// 小屏隐藏税率列后，其余列用更紧凑的最小宽度，保证 960 宽也能完整显示
+const MIN_COLUMN_WIDTHS_COMPACT: Record<Exclude<keyof typeof BASE_COLUMN_WIDTHS, "rate">, number> = {
+  date: 88,
+  type: 66,
+  base: 78,
+  overtime: 72,
+  oneTime: 76,
+  insurance: 76,
+  bonus: 82,
+  tax: 72,
+  net: 84,
+};
+
 function computeColumnWidths(available: number) {
-  const keys = Object.keys(BASE_COLUMN_WIDTHS) as (keyof typeof BASE_COLUMN_WIDTHS)[];
+  const allKeys = Object.keys(BASE_COLUMN_WIDTHS) as (keyof typeof BASE_COLUMN_WIDTHS)[];
+  const keys = showTaxRate.value ? allKeys : allKeys.filter((key) => key !== "rate");
+  const minWidths = showTaxRate.value ? MIN_COLUMN_WIDTHS : MIN_COLUMN_WIDTHS_COMPACT;
   const baseSum = keys.reduce((sum, key) => sum + BASE_COLUMN_WIDTHS[key], 0);
   const dataAvailable = Math.max(360, available - OPERATION_RESERVED);
   const next = { ...BASE_COLUMN_WIDTHS, operation: OPERATION_WIDTH } as {
@@ -260,7 +287,7 @@ function computeColumnWidths(available: number) {
     // 最小窗口下按比例收窄列宽，同时保住日期/类型/金额等列的最小可读宽度
     const scale = dataAvailable / baseSum;
     keys.forEach((key) => {
-      next[key] = Math.max(MIN_COLUMN_WIDTHS[key], Math.floor(BASE_COLUMN_WIDTHS[key] * scale));
+      next[key] = Math.max((minWidths as Record<string, number>)[key], Math.floor(BASE_COLUMN_WIDTHS[key] * scale));
     });
   }
 
@@ -290,21 +317,56 @@ function computeColumnWidths(available: number) {
   return next;
 }
 
+// 首屏和隐藏状态下只能按窗口宽度估算可用宽度；<=1120 时侧栏收成 64px，
+// 不能再用 266 这个间距，否则切回薪酬页会先按错误宽度渲染、200ms 后再跳一次。
+function fallbackAvailable(): number {
+  const chrome = window.innerWidth <= 1120 ? 138 : 266;
+  return window.innerWidth - chrome;
+}
+
+// 首次量到真实宽度后记下「窗口宽度 - 表格可用宽度」的差值，之后隐藏状态下都用实测值推算，
+// 这样即使以后调整侧栏/内边距，切页首帧也不会因为常量过期而跳一下。
+let measuredChrome: number | null = null;
+
+function applyColumnWidths(available: number) {
+  const next = computeColumnWidths(available);
+  const current = columnWidths.value;
+  // 列宽没变就不要重新赋值：避免 el-table 做无意义的重排
+  const changed = (Object.keys(next) as (keyof typeof next)[]).some((key) => next[key] !== current[key]);
+  if (changed) {
+    columnWidths.value = next;
+  }
+}
+
+// 含税率列的 12 列即使按最小宽度也铺不下时（可用宽度小于这个值），就该收起税率列，
+// 否则表格会横向溢出、多出一条横向滚动条。
+const RATE_COLUMN_MIN_AVAILABLE =
+  Object.values(MIN_COLUMN_WIDTHS).reduce((sum, width) => sum + width, 0) + OPERATION_RESERVED;
+
 // 首屏按窗口宽度预计算，避免切换 tab 时表格从旧宽度重新分配造成“弹一下”
-const initialAvailable = Math.max(600, window.innerWidth - 266);
+const initialAvailable = Math.max(600, fallbackAvailable());
+const showTaxRate = ref(initialAvailable >= RATE_COLUMN_MIN_AVAILABLE);
 const columnWidths = ref(computeColumnWidths(initialAvailable));
 const tableCard = ref<HTMLElement | null>(null);
+const tableRef = ref<TableInstance | null>(null);
 
 function updateColumnWidths() {
   const card = tableCard.value;
-  let available = card ? Math.floor(card.clientWidth - 20) : 0;
-  if (available < 600) {
-    available = window.innerWidth - 266;
+  const cardAvailable = card ? Math.floor(card.clientWidth - 20) : 0;
+  let available = cardAvailable;
+  if (cardAvailable >= 600) {
+    measuredChrome = window.innerWidth - cardAvailable;
+  } else {
+    available = measuredChrome == null ? fallbackAvailable() : window.innerWidth - measuredChrome;
   }
   if (available < 600) {
     return;
   }
-  columnWidths.value = computeColumnWidths(available);
+  const nextShowTaxRate = available >= RATE_COLUMN_MIN_AVAILABLE;
+  if (nextShowTaxRate !== showTaxRate.value) {
+    showTaxRate.value = nextShowTaxRate;
+  }
+  applyColumnWidths(available);
 }
 
 const salaryVisible = ref(false);
@@ -551,10 +613,23 @@ onUnmounted(() => {
   window.removeEventListener("resize", updateColumnWidths);
 });
 
-onActivated(() => {
-  updateColumnWidths();
-  reloadAll();
-});
+// 切到薪酬页时立刻按真实宽度收口，并让 el-table 当场重算布局：
+// 不再依赖 main.ts 里带 200ms 防抖的 ResizeObserver，否则页签显示后
+// 列宽/行高会在 200ms 后再跳一次。
+watch(
+  () => props.active,
+  (active) => {
+    if (!active) {
+      return;
+    }
+    updateColumnWidths();
+    nextTick(() => {
+      tableRef.value?.doLayout?.();
+      updateColumnWidths();
+    });
+  },
+  { flush: "post" }
+);
 </script>
 
 <style scoped>
@@ -933,4 +1008,32 @@ onActivated(() => {
   border-color: #5a4cc0;
   color: #ffffff;
 }
+
+/* 数字列禁止换行，避免大金额把行高撑成两倍 */
+.payroll-table :deep(td.el-table__cell .cell),
+.payroll-table :deep(th.el-table__cell .cell) {
+  white-space: nowrap;
+}
+
+@media (max-width: 1300px) {
+  .payroll-table {
+    font-size: 12px;
+  }
+
+  .payroll-table :deep(.cell) {
+    padding: 0 8px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .payroll-table,
+  .payroll-table :deep(th.el-table__cell) {
+    font-size: 11px;
+  }
+
+  .payroll-table :deep(.cell) {
+    padding: 0 6px;
+  }
+}
+
 </style>
