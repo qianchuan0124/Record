@@ -14,6 +14,7 @@ import * as fs from "fs";
 import * as fsp from "fs/promises";
 import path from "path";
 import os from "os";
+import { execSync } from "child_process";
 import crypto from "crypto";
 import sqlite3 from "sqlite3";
 import { IpcType } from "@/models/IpcResponse";
@@ -227,13 +228,57 @@ function syncFolder(create = false): string {
     return folder;
 }
 
-function deviceTag(): string {
-    const name = os.hostname() || "device";
-    return crypto.createHash("sha1").update(name).digest("hex").slice(0, 4);
+let deviceIdCache = "";
+let hardwareModelCache = "";
+
+/** 本机匿名设备标识：只用于区分快照归属，不包含主机名等可识别信息 */
+function deviceId(): string {
+    if (deviceIdCache) {
+        return deviceIdCache;
+    }
+    const file = path.join(userDataPath, "device-id");
+    try {
+        const stored = fs.readFileSync(file, "utf8").trim();
+        if (stored) {
+            deviceIdCache = stored;
+            return stored;
+        }
+    } catch (error) {
+        // 首次运行时还没有设备标识
+    }
+    // Electron 13 自带的 Node 14 没有 crypto.randomUUID，使用随机字节生成匿名 ID
+    const generated = crypto.randomBytes(16).toString("hex");
+    try {
+        fs.writeFileSync(file, generated, "utf8");
+    } catch (error) {
+        // 写入失败时本次运行仍然使用生成的标识
+    }
+    deviceIdCache = generated;
+    return generated;
 }
 
+function deviceTag(): string {
+    return crypto.createHash("sha1").update(deviceId()).digest("hex").slice(0, 4);
+}
+
+/** 对外只暴露硬件型号，不读取或写入主机名 */
 function deviceName(): string {
-    return os.hostname() || "未知设备";
+    if (hardwareModelCache) {
+        return hardwareModelCache;
+    }
+    if (process.platform === "darwin") {
+        try {
+            const model = execSync("/usr/sbin/sysctl -n hw.model", { encoding: "utf8" }).trim();
+            if (model) {
+                hardwareModelCache = model;
+                return model;
+            }
+        } catch (error) {
+            // sysctl 不可用时回退到通用名称
+        }
+    }
+    hardwareModelCache = "Mac";
+    return hardwareModelCache;
 }
 
 function nowText(): string {
@@ -465,6 +510,7 @@ async function contentState(): Promise<string> {
             "SELECT id, name, amount, syncId FROM budget_item ORDER BY id",
             "SELECT id, name, icon, syncId FROM deposit_bank ORDER BY id",
             "SELECT id, bankKey, startDate, amount, years, rate, interest, sortOrder, syncId FROM deposit_record ORDER BY id",
+            "SELECT key, value, syncId FROM app_setting ORDER BY key",
         ];
         for (const sql of payrollTables) {
             const rows = await queryAll(getDb(), sql);
@@ -829,12 +875,16 @@ function readMobileBackup(file: string): MobileBackupItem | null {
         const categories = Array.isArray(parsed.categories) ? parsed.categories : [];
         const created = parsed.createdAt ? new Date(parsed.createdAt) : stat.mtime;
         const createdDate = isNaN(created.getTime()) ? stat.mtime : created;
+        const hardware = parsed.hardware && typeof parsed.hardware === "object" ? parsed.hardware : null;
+        const hardwareName = hardware
+            ? String(hardware.name || hardware.identifier || "").trim()
+            : "";
         return {
             file,
             name: path.basename(file),
             created_at: formatDateTime(createdDate),
             created_ts: Math.floor(createdDate.getTime() / 1000),
-            device: String(parsed.device || "移动端"),
+            device: hardwareName || String(parsed.device || "移动端"),
             counts: {
                 record: records.length,
                 salary: salaries.length,
@@ -875,9 +925,10 @@ export function importMobileBackup(file: string): Promise<any> {
         } catch (error) {
             throw new CloudSyncError("移动端备份文件读取失败");
         }
+        const localBackup = await backupLocalBeforeRestore();
         const result = await importMobileBackupData(payload);
-        logInfo("mobile backup imported: " + target);
-        return result;
+        logInfo("mobile backup restored: " + target);
+        return { ...result, local_backup: localBackup };
     });
 }
 

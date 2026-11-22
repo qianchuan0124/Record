@@ -424,8 +424,8 @@ async function confirmSync() {
       const result = await importMobileBackup(version.file);
       syncVisible.value = false;
       ElMessage.success({
-        message: `${L10n.mobile_import_success}：${L10n.record_count} ${result.records} · ${L10n.salary} ${result.salaries} · ${L10n.deposit} ${result.deposits}`,
-        duration: 5000,
+        message: `${L10n.mobile_import_success}：${L10n.record_count} ${result.records} · ${L10n.salary} ${result.salaries} · ${L10n.deposit} ${result.deposits} · ${L10n.local_backup_tip} ${result.local_backup}`,
+        duration: 6000,
       });
       notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
       updateCurrentCategory();

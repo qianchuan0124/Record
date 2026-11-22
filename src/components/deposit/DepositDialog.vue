@@ -32,13 +32,16 @@
             style="width: 100%" />
         </el-form-item>
         <el-form-item :label="L10n.amount">
-          <el-input-number
-            v-model="form.amount"
-            :min="0"
-            :precision="2"
-            :controls="false"
-            class="number-input"
-            @change="recalcInterest" />
+          <div class="amount-field">
+            <el-input-number
+              v-model="form.amount"
+              :min="0"
+              :precision="2"
+              :controls="false"
+              class="number-input"
+              @change="recalcInterest" />
+            <span v-if="amountUnitText" class="amount-unit">{{ amountUnitText }}</span>
+          </div>
         </el-form-item>
       </div>
 
@@ -165,6 +168,24 @@ function round2(value: number): number {
   return Math.round((Number(value) || 0) * 100) / 100;
 }
 
+const amountUnitText = computed(() => {
+  const amount = Number(form.value.amount) || 0;
+  if (amount < 1000) {
+    return "";
+  }
+  const format = (value: number) => {
+    const truncated = Math.floor(value * 100) / 100;
+    return String(truncated);
+  };
+  if (amount < 10000) {
+    return `${format(amount / 1000)}千`;
+  }
+  if (amount < 100000000) {
+    return `${format(amount / 10000)}万`;
+  }
+  return `${format(amount / 100000000)}亿`;
+});
+
 function recalcInterest() {
   const amount = Number(form.value.amount) || 0;
   const years = Number(form.value.years) || 0;
@@ -267,6 +288,30 @@ async function save() {
   flex: 0 0 auto;
   font-size: 12px;
   color: #9aa0ad;
+}
+
+.amount-field {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.amount-field .number-input {
+  width: 100%;
+}
+
+.amount-field :deep(.el-input__wrapper) {
+  padding-right: 52px;
+}
+
+.amount-unit {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: #6c5dd3;
+  pointer-events: none;
 }
 
 .interest-field {

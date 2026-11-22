@@ -5,8 +5,8 @@ import { app } from 'electron';
 import { Record } from "@/models/Record";
 import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from "@/models/Payroll";
 import { DepositBank, DepositData, DepositRecord } from "@/models/Deposit";
+import { BudgetSettings } from "@/models/Budget";
 import { presetByName } from "@/configs/BankPresets";
-import CategoryData from "@/configs/Category.json";
 import { calcSalaryTax } from "@/utils/PayrollTax";
 import { IpcResponse, IpcType } from "@/models/IpcResponse";
 import fs from "fs/promises";
@@ -89,6 +89,12 @@ CREATE TABLE IF NOT EXISTS deposit_record (
     interest REAL NOT NULL DEFAULT 0,
     sortOrder INTEGER DEFAULT 0,
     isDeleted BOOLEAN DEFAULT 0,
+    syncId INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS app_setting (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT '',
     syncId INTEGER DEFAULT 0
 );
 `
@@ -485,6 +491,25 @@ export function databaseListen() {
             return handleResult(await fetchPayrollData());
         } catch (error: unknown) {
             logError("Fetching payroll data failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.FETCH_BUDGET_SETTINGS, async () => {
+        try {
+            return handleResult(await fetchBudgetSettings());
+        } catch (error: unknown) {
+            logError("Fetching budget settings failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.SAVE_BUDGET_SETTINGS, async (event, settings) => {
+        try {
+            const parsed = typeof settings === "string" ? JSON.parse(settings) : settings;
+            return handleResult(await saveBudgetSettings(parsed));
+        } catch (error: unknown) {
+            logError("Saving budget settings failed:" + error);
             return handleError(error);
         }
     })
@@ -1818,58 +1843,84 @@ function mobileDate(value: unknown): number {
     return date.getTime();
 }
 
-async function importMobileCategories(items: any[]): Promise<number> {
+async function replaceMobileCategories(items: any[]): Promise<number> {
     if (items.length === 0) {
+        try {
+            await fs.unlink(customCategoryPath);
+        } catch (error) {
+            // 没有自定义分类文件时忽略
+        }
         return 0;
     }
-    let categories: any[] = [];
-    try {
-        const raw = await fs.readFile(customCategoryPath, "utf8");
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-            categories = parsed;
-        }
-    } catch (error) {
-        categories = JSON.parse(JSON.stringify((CategoryData as any).default || []));
-    }
-    if (categories.length === 0) {
-        categories = JSON.parse(JSON.stringify((CategoryData as any).default || []));
-    }
 
-    let added = 0;
+    const roots = new Map<string, any>();
+    const childrenByParent = new Map<string, any[]>();
+    const ensureRoot = (name: string, order: number) => {
+        if (!roots.has(name)) {
+            roots.set(name, { label: name, value: name, children: [], order });
+        }
+        return roots.get(name);
+    };
+
     for (const item of items) {
         const name = String(item && item.name ? item.name : "").trim();
         if (!name) {
             continue;
         }
         const parentName = String(item && item.parentName ? item.parentName : "").trim();
-        if (parentName) {
-            let parent = categories.find((node) => String(node.label) === parentName);
-            if (!parent) {
-                parent = { label: parentName, value: parentName, children: [] };
-                categories.push(parent);
-            }
-            if (!Array.isArray(parent.children)) {
-                parent.children = [];
-            }
-            if (!parent.children.some((child: any) => String(child.label) === name)) {
-                parent.children.push({ label: name, value: name });
-                added += 1;
-            }
-        } else if (!categories.some((node) => String(node.label) === name)) {
-            categories.push({ label: name, value: name, children: [] });
-            added += 1;
+        const order = mobileNumber(item && item.order);
+        if (!parentName || parentName === name) {
+            ensureRoot(name, order);
+            continue;
+        }
+        ensureRoot(parentName, order);
+        if (!childrenByParent.has(parentName)) {
+            childrenByParent.set(parentName, []);
+        }
+        const children = childrenByParent.get(parentName) as any[];
+        if (!children.some((child) => child.label === name)) {
+            children.push({ label: name, value: name, order });
         }
     }
-    if (added > 0) {
-        await saveCustomCategory(JSON.stringify(categories));
+
+    for (const [parentName, children] of childrenByParent.entries()) {
+        const parent = ensureRoot(parentName, 0);
+        parent.children = children
+            .sort((left, right) => Number(left.order) - Number(right.order))
+            .map((child) => ({ label: child.label, value: child.value }));
     }
-    return added;
+
+    const result = Array.from(roots.values())
+        .sort((left, right) => Number(left.order) - Number(right.order))
+        .map((root) => ({
+            label: root.label,
+            value: root.value,
+            children: root.children,
+        }));
+    await saveCustomCategory(JSON.stringify(result));
+    let count = 0;
+    for (const root of result) {
+        count += 1;
+        count += root.children.length;
+    }
+    return count;
+}
+
+function runDatabase(sql: string, params: any[] = []): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        db.run(sql, params, (err) => {
+            if (err) {
+                reject(new Error(ErrorType.DATA_BASE_ERROR));
+            } else {
+                resolve();
+            }
+        });
+    });
 }
 
 /**
- * 合并导入移动端的 record-backup-*.json：
- * 流水按内容去重，工资/年终奖/预算复用 importPayroll，存款和自定义银行按内容去重，自定义分类合并。
+ * 按移动端 v1.1 备份协议整库覆盖恢复 record-backup-*.json。
+ * 业务表全部替换；银行目录保留；budgetSettings 存在时覆盖，缺失时保留本机配置。
  */
 export async function importMobileBackupData(payload: any): Promise<MobileBackupImportResult> {
     const result: MobileBackupImportResult = {
@@ -1882,41 +1933,12 @@ export async function importMobileBackupData(payload: any): Promise<MobileBackup
     };
 
     const records = Array.isArray(payload && payload.records) ? payload.records : [];
-    for (const item of records) {
-        const date = mobileDate(item && item.date);
-        const rawType = item && item.typeRaw ? String(item.typeRaw) : "";
-        const type = rawType === "income" || rawType === "收入" ? "收入"
-            : rawType === "expense" || rawType === "支出" ? "支出" : "";
-        const category = String(item && item.category ? item.category : "");
-        const subCategory = String(item && item.subCategory ? item.subCategory : "");
-        const amount = mobileNumber(item && item.amount);
-        const remark = String(item && item.remark ? item.remark : "");
-        if (!date || !type || !category || !subCategory || !amount) {
-            continue;
-        }
-        const exists = await dbGet(
-            "SELECT id FROM record WHERE isDeleted = 0 AND date = ? AND type = ? AND category = ? AND subCategory = ? AND amount = ? AND remark = ?",
-            [date, type, category, subCategory, amount, remark]
-        );
-        if (exists) {
-            continue;
-        }
-        await createRecord({
-            id: 0,
-            date: new Date(date),
-            amount,
-            type,
-            category,
-            subCategory,
-            remark,
-            isDeleted: false,
-            syncId: 0,
-            countInBudget: item && item.countInBudget === false ? 0 : 1,
-        });
-        result.records += 1;
-    }
-
     const salaryItems = Array.isArray(payload && payload.salaries) ? payload.salaries : [];
+    const bonusItems = Array.isArray(payload && payload.bonuses) ? payload.bonuses : [];
+    const budgetItems = Array.isArray(payload && payload.budgets) ? payload.budgets : [];
+    const depositItems = Array.isArray(payload && payload.deposits) ? payload.deposits : [];
+    const categoryItems = Array.isArray(payload && payload.categories) ? payload.categories : [];
+
     const salaryRows: SalaryRecord[] = [];
     for (const item of salaryItems) {
         const date = mobileDate(item && item.date);
@@ -1942,7 +1964,6 @@ export async function importMobileBackupData(payload: any): Promise<MobileBackup
         });
     }
 
-    const bonusItems = Array.isArray(payload && payload.bonuses) ? payload.bonuses : [];
     const bonusRows: AnnualBonus[] = [];
     for (const item of bonusItems) {
         const date = mobileDate(item && item.date);
@@ -1961,7 +1982,6 @@ export async function importMobileBackupData(payload: any): Promise<MobileBackup
         });
     }
 
-    const budgetItems = Array.isArray(payload && payload.budgets) ? payload.budgets : [];
     const budgetRows: BudgetItem[] = budgetItems
         .map((item: any) => ({
             id: 0,
@@ -1970,62 +1990,83 @@ export async function importMobileBackupData(payload: any): Promise<MobileBackup
         }))
         .filter((item: BudgetItem) => !!item.name);
 
-    const payrollResult = await importPayroll({
-        salaries: salaryRows,
-        bonuses: bonusRows,
-        budgets: budgetRows,
+    await new Promise<void>((resolve, reject) => {
+        db.run("BEGIN IMMEDIATE", (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve()));
     });
-    result.salaries = payrollResult.insertedSalaries;
-    result.bonuses = payrollResult.insertedBonuses;
-    result.budgets = payrollResult.insertedBudgets;
 
-    const depositItems = Array.isArray(payload && payload.deposits) ? payload.deposits : [];
-    for (const item of depositItems) {
-        const bankName = String(item && item.bankName ? item.bankName : "").trim();
-        const startDate = mobileDate(item && item.startDate);
-        const amount = mobileNumber(item && item.amount);
-        const years = mobileNumber(item && item.years);
-        const rate = mobileNumber(item && item.rate);
-        if (!bankName || !startDate || !amount) {
-            continue;
-        }
-        let bankKey = "";
-        const preset = presetByName(bankName);
-        if (preset) {
-            bankKey = `b:${preset.icon}`;
-        } else {
-            const existingBank = await dbGet(
-                "SELECT id FROM deposit_bank WHERE isDeleted = 0 AND name = ?",
-                [bankName]
-            ) as { id: number } | undefined;
-            if (existingBank) {
-                bankKey = `c:${existingBank.id}`;
-            } else {
-                const bankId = await new Promise<number>((resolve, reject) => {
-                    db.run(
-                        "INSERT INTO deposit_bank (name, icon) VALUES (?, ?)",
-                        [bankName, ""],
-                        function (err) {
-                            if (err) {
-                                reject(new Error(ErrorType.DATA_BASE_ERROR));
-                            } else {
-                                resolve(this.lastID);
-                            }
-                        }
-                    );
-                });
-                bankKey = `c:${bankId}`;
+    try {
+        await runDatabase("DELETE FROM record");
+        await runDatabase("DELETE FROM salary_record");
+        await runDatabase("DELETE FROM annual_bonus");
+        await runDatabase("DELETE FROM budget_item");
+        await runDatabase("DELETE FROM deposit_record");
+
+        for (const item of records) {
+            const date = mobileDate(item && item.date);
+            const rawType = item && item.typeRaw ? String(item.typeRaw) : "";
+            const type = rawType === "income" || rawType === "收入" ? "收入"
+                : rawType === "expense" || rawType === "支出" ? "支出" : "";
+            const category = String(item && item.category ? item.category : "");
+            const subCategory = String(item && item.subCategory ? item.subCategory : "");
+            const amount = mobileNumber(item && item.amount);
+            const remark = String(item && item.remark ? item.remark : "");
+            if (!date || !type || !category || !subCategory || !amount) {
+                continue;
             }
+            await runDatabase(
+                "INSERT INTO record (date, type, category, subCategory, amount, remark, countInBudget) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [date, type, category, subCategory, amount, remark, item && item.countInBudget === false ? 0 : 1]
+            );
+            result.records += 1;
         }
-        const exists = await dbGet(
-            "SELECT id FROM deposit_record WHERE isDeleted = 0 AND bankKey = ? AND startDate = ? AND amount = ? AND years = ? AND rate = ?",
-            [bankKey, startDate, amount, years, rate]
-        );
-        if (exists) {
-            continue;
-        }
-        await new Promise<void>((resolve, reject) => {
-            db.run(
+
+        const payrollResult = await importPayroll({
+            salaries: salaryRows,
+            bonuses: bonusRows,
+            budgets: budgetRows,
+        });
+        result.salaries = payrollResult.insertedSalaries;
+        result.bonuses = payrollResult.insertedBonuses;
+        result.budgets = payrollResult.insertedBudgets;
+
+        for (const item of depositItems) {
+            const bankName = String(item && item.bankName ? item.bankName : "").trim();
+            const startDate = mobileDate(item && item.startDate);
+            const amount = mobileNumber(item && item.amount);
+            const years = mobileNumber(item && item.years);
+            const rate = mobileNumber(item && item.rate);
+            if (!bankName || !startDate || !amount) {
+                continue;
+            }
+            let bankKey = "";
+            const preset = presetByName(bankName);
+            if (preset) {
+                bankKey = `b:${preset.icon}`;
+            } else {
+                const existingBank = await dbGet(
+                    "SELECT id FROM deposit_bank WHERE isDeleted = 0 AND name = ?",
+                    [bankName]
+                ) as { id: number } | undefined;
+                if (existingBank) {
+                    bankKey = `c:${existingBank.id}`;
+                } else {
+                    const bankId = await new Promise<number>((resolve, reject) => {
+                        db.run(
+                            "INSERT INTO deposit_bank (name, icon) VALUES (?, ?)",
+                            [bankName, ""],
+                            function (err) {
+                                if (err) {
+                                    reject(new Error(ErrorType.DATA_BASE_ERROR));
+                                } else {
+                                    resolve(this.lastID);
+                                }
+                            }
+                        );
+                    });
+                    bankKey = `c:${bankId}`;
+                }
+            }
+            await runDatabase(
                 `INSERT INTO deposit_record
                  (bankId, bankKey, startDate, amount, years, rate, interest, sortOrder)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -2038,18 +2079,77 @@ export async function importMobileBackupData(payload: any): Promise<MobileBackup
                     rate,
                     mobileNumber(item && item.interest),
                     mobileNumber(item && item.order) + 1,
-                ],
-                (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+                ]
             );
+            result.deposits += 1;
+        }
+
+        if (payload && payload.budgetSettings) {
+            await saveBudgetSettings(payload.budgetSettings);
+        }
+
+        await new Promise<void>((resolve, reject) => {
+            db.run("COMMIT", (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve()));
         });
-        result.deposits += 1;
+    } catch (error) {
+        await new Promise<void>((resolve) => {
+            db.run("ROLLBACK", () => resolve());
+        });
+        throw error;
     }
 
-    const categoryItems = Array.isArray(payload && payload.categories)
-        ? payload.categories.filter((item: any) => item && item.isSystem !== true)
-        : [];
-    result.categories = await importMobileCategories(categoryItems);
+    try {
+        result.categories = await replaceMobileCategories(categoryItems);
+    } catch (error) {
+        logError("replace mobile categories failed: " + error);
+    }
     return result;
+}
+
+const DEFAULT_BUDGET_SETTINGS: BudgetSettings = {
+    cycleEnabled: false,
+    startDay: 26,
+    endDay: 25,
+    incomeMode: "current",
+};
+
+function normalizeBudgetSettings(input: any): BudgetSettings {
+    const startDay = Number(input && input.startDay);
+    const endDay = Number(input && input.endDay);
+    return {
+        cycleEnabled: !!(input && input.cycleEnabled),
+        startDay: startDay >= 1 && startDay <= 31 ? Math.round(startDay) : DEFAULT_BUDGET_SETTINGS.startDay,
+        endDay: endDay >= 1 && endDay <= 31 ? Math.round(endDay) : DEFAULT_BUDGET_SETTINGS.endDay,
+        incomeMode: input && input.incomeMode === "next" ? "next" : "current",
+    };
+}
+
+export async function fetchBudgetSettings(): Promise<BudgetSettings | null> {
+    const row = await dbGet(
+        "SELECT value FROM app_setting WHERE key = ?",
+        ["budget"]
+    ) as { value: string } | undefined;
+    if (!row || !row.value) {
+        return null;
+    }
+    try {
+        return normalizeBudgetSettings(JSON.parse(row.value));
+    } catch (error) {
+        return null;
+    }
+}
+
+export async function saveBudgetSettings(settings: BudgetSettings): Promise<BudgetSettings> {
+    const normalized = normalizeBudgetSettings(settings);
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            `INSERT INTO app_setting (key, value, syncId) VALUES ('budget', ?, 0)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, syncId = syncId + 1`,
+            [JSON.stringify(normalized)],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return normalized;
 }
 
 export async function importPayroll(payload: { salaries?: SalaryRecord[]; bonuses?: AnnualBonus[]; budgets?: BudgetItem[] }) {

@@ -112,10 +112,44 @@
         <div class="budget-head">
           <span class="budget-title">{{ L10n.month_budget }}</span>
           <span class="budget-month">{{ monthLabel }}</span>
+          <div class="budget-options">
+            <div class="cycle-control">
+              <div class="cycle-dates">
+                <template v-if="cycleEnabled">
+                  <el-select v-model="startDay" size="small" class="day-select">
+                    <el-option
+                      v-for="day in 31"
+                      :key="'start-' + day"
+                      :label="`${L10n.last_month_day}${day}${L10n.day_unit}`"
+                      :value="day" />
+                  </el-select>
+                  <span class="range-sep">{{ L10n.to }}</span>
+                  <el-select v-model="endDay" size="small" class="day-select">
+                    <el-option
+                      v-for="day in 31"
+                      :key="'end-' + day"
+                      :label="`${L10n.this_month_day}${day}${L10n.day_unit}`"
+                      :value="day" />
+                  </el-select>
+                </template>
+              </div>
+              <span class="range-actual">{{ expenseRangeText }}</span>
+              <el-switch
+                v-model="cycleEnabled"
+                size="small"
+                inline-prompt
+                :active-text="L10n.budget_cycle"
+                :inactive-text="L10n.budget_natural_month" />
+            </div>
+            <el-radio-group v-model="incomeMode" size="small" class="income-mode">
+              <el-radio-button value="current">{{ L10n.income_current_month }}</el-radio-button>
+              <el-radio-button value="next">{{ L10n.income_next_month }}</el-radio-button>
+            </el-radio-group>
+          </div>
         </div>
         <div class="budget-stats">
           <div class="budget-stat">
-            <span class="stat-label">{{ L10n.monthly_net_income }}</span>
+            <span class="stat-label">{{ incomeLabel }}</span>
             <span class="stat-number income">+{{ monthIncome.toFixed(2) }}</span>
           </div>
           <div class="budget-stat">
@@ -127,7 +161,7 @@
             <span class="stat-number">{{ totalBudget.toFixed(2) }}</span>
           </div>
           <div class="budget-stat">
-            <span class="stat-label">{{ L10n.month_expense }}</span>
+            <span class="stat-label">{{ expenseLabel }}</span>
             <span class="stat-number expense">-{{ monthExpense.toFixed(2) }}</span>
           </div>
           <div class="budget-stat is-highlight">
@@ -185,14 +219,16 @@ import { Plus, Setting } from "@element-plus/icons-vue";
 import type { TableInstance } from "element-plus";
 import L10n from "@/configs/L10n.json";
 import { AnnualBonus, BudgetItem, SalaryRecord } from "@/models/Payroll";
+import { BudgetSettings } from "@/models/Budget";
 import {
   deleteBonus,
   deleteSalary,
   fetchBudgetExpense,
+  fetchBudgetSettings,
   fetchPayrollData,
+  saveBudgetSettings,
 } from "@/utils/DataCenter";
 import { formatDateByDot } from "@/utils/DateUtils";
-import { getFirstAndLastDate } from "@/components/dashboard/managers/MonthManager";
 import { notifyCenter, NotifyType } from "@/utils/NotifyCenter";
 import { applyPayrollCache, payrollCache, payrollDataChanged } from "./PayrollStore";
 import SalaryDialog from "./SalaryDialog.vue";
@@ -413,16 +449,136 @@ const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime
 const currentMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
 const monthLabel = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-function inCurrentMonth(timestamp: number): boolean {
-  return timestamp >= currentMonthStart && timestamp <= currentMonthEnd;
+type IncomeMode = "current" | "next";
+const BUDGET_PREFS_KEY = "record-budget-prefs";
+const cycleEnabled = ref(false);
+const startDay = ref(26);
+const endDay = ref(25);
+const incomeMode = ref<IncomeMode>("current");
+let settingsReady = false;
+let saveSettingsTimer: number | null = null;
+
+function applyBudgetSettings(settings: BudgetSettings) {
+  cycleEnabled.value = settings.cycleEnabled === true;
+  startDay.value = settings.startDay >= 1 && settings.startDay <= 31 ? settings.startDay : 26;
+  endDay.value = settings.endDay >= 1 && settings.endDay <= 31 ? settings.endDay : 25;
+  incomeMode.value = settings.incomeMode === "next" ? "next" : "current";
+}
+
+function legacyBudgetSettings(): BudgetSettings | null {
+  try {
+    const raw = localStorage.getItem(BUDGET_PREFS_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    const start = Number(parsed.startDay);
+    const end = Number(parsed.endDay);
+    return {
+      cycleEnabled: parsed.cycleEnabled === true,
+      startDay: start >= 1 && start <= 31 ? start : 26,
+      endDay: end >= 1 && end <= 31 ? end : 25,
+      incomeMode: parsed.incomeMode === "next" ? "next" : "current",
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadBudgetSettings() {
+  settingsReady = false;
+  try {
+    const stored = await fetchBudgetSettings();
+    if (stored) {
+      applyBudgetSettings(stored);
+    } else {
+      const legacy = legacyBudgetSettings();
+      if (legacy) {
+        applyBudgetSettings(legacy);
+        await saveBudgetSettings(legacy);
+        localStorage.removeItem(BUDGET_PREFS_KEY);
+      }
+    }
+  } catch (error) {
+    // 读取失败时保留默认配置，不阻塞页面
+  } finally {
+    settingsReady = true;
+  }
+}
+
+function scheduleSaveBudgetSettings() {
+  if (!settingsReady) {
+    return;
+  }
+  if (saveSettingsTimer) {
+    window.clearTimeout(saveSettingsTimer);
+  }
+  saveSettingsTimer = window.setTimeout(async () => {
+    saveSettingsTimer = null;
+    try {
+      await saveBudgetSettings({
+        cycleEnabled: cycleEnabled.value,
+        startDay: startDay.value,
+        endDay: endDay.value,
+        incomeMode: incomeMode.value,
+      });
+      localStorage.removeItem(BUDGET_PREFS_KEY);
+    } catch (error) {
+      // 保存失败时保留当前界面状态，下次修改会再次尝试
+    }
+  }, 150);
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function monthDay(year: number, month: number, day: number, endOfDay = false): number {
+  const date = new Date(year, month, Math.min(Math.max(1, day), daysInMonth(year, month)));
+  if (endOfDay) {
+    date.setHours(23, 59, 59, 999);
+  } else {
+    date.setHours(0, 0, 0, 0);
+  }
+  return date.getTime();
+}
+
+const expenseRange = computed<[number, number]>(() => {
+  if (!cycleEnabled.value) {
+    return [currentMonthStart, currentMonthEnd];
+  }
+  const start = monthDay(now.getFullYear(), now.getMonth() - 1, startDay.value);
+  const end = monthDay(now.getFullYear(), now.getMonth(), endDay.value, true);
+  return [start, end];
+});
+
+function shortDate(timestamp: number): string {
+  const date = new Date(timestamp);
+  return `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+}
+
+const expenseRangeText = computed(() => `${shortDate(expenseRange.value[0])} - ${shortDate(expenseRange.value[1])}`);
+const incomeLabel = computed(() => incomeMode.value === "next" ? L10n.next_month_income : L10n.monthly_net_income);
+const expenseLabel = computed(() => cycleEnabled.value ? L10n.period_expense : L10n.month_expense);
+
+const incomeRange = computed<[number, number]>(() => {
+  const offset = incomeMode.value === "next" ? 1 : 0;
+  return [
+    new Date(now.getFullYear(), now.getMonth() + offset, 1).getTime(),
+    new Date(now.getFullYear(), now.getMonth() + offset + 1, 0, 23, 59, 59, 999).getTime(),
+  ];
+});
+
+function inIncomeMonth(timestamp: number): boolean {
+  return timestamp >= incomeRange.value[0] && timestamp <= incomeRange.value[1];
 }
 
 const monthIncome = computed(() => {
   const salaryNet = salaries.value
-    .filter((item) => inCurrentMonth(Number(item.date)))
+    .filter((item) => inIncomeMonth(Number(item.date)))
     .reduce((sum, item) => sum + Number(item.netPay || 0), 0);
   const bonusNet = bonuses.value
-    .filter((item) => inCurrentMonth(Number(item.date)))
+    .filter((item) => inIncomeMonth(Number(item.date)))
     .reduce((sum, item) => sum + Number(item.netPay || 0), 0);
   return salaryNet + bonusNet;
 });
@@ -477,11 +633,18 @@ function taxRateClass(value?: number): string {
 }
 
 async function loadExpense() {
-  const [start, end] = getFirstAndLastDate(new Date());
-  const expense = await fetchBudgetExpense(start.getTime(), end.getTime());
+  const [start, end] = expenseRange.value;
+  const expense = await fetchBudgetExpense(start, end);
   monthExpense.value = expense;
   payrollCache.monthExpense = expense;
 }
+
+watch([cycleEnabled, startDay, endDay], () => {
+  scheduleSaveBudgetSettings();
+  loadExpense();
+});
+
+watch(incomeMode, scheduleSaveBudgetSettings);
 
 let reloadPromise: Promise<void> | null = null;
 
@@ -491,10 +654,10 @@ async function reloadAll() {
   }
   reloadPromise = (async () => {
     try {
-      const [start, end] = getFirstAndLastDate(new Date());
+      const [start, end] = expenseRange.value;
       const [data, expense] = await Promise.all([
         fetchPayrollData(),
-        fetchBudgetExpense(start.getTime(), end.getTime()),
+        fetchBudgetExpense(start, end),
       ]);
       const next = {
         salaries: data.salaries || [],
@@ -574,6 +737,7 @@ function handleRecordChanged() {
 }
 
 function handleImportChanged() {
+  void loadBudgetSettings();
   reloadAll();
 }
 
@@ -594,6 +758,7 @@ function disableNotify() {
 let cardObserver: ResizeObserver | null = null;
 
 onMounted(() => {
+  void loadBudgetSettings();
   reloadAll();
   registerNotify();
   updateColumnWidths();
@@ -919,8 +1084,64 @@ watch(
 
 .budget-head {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.budget-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-left: auto;
+}
+
+.cycle-control {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 固定日期区域宽度：自然月时隐藏选择器但保留位置，避免整体跳动 */
+.cycle-dates {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 229px;
+  flex: 0 0 229px;
+}
+
+/* 两种文案宽度不同，固定开关宽度，避免切换时把左侧日期控件挤动 */
+.cycle-control :deep(.el-switch) {
+  flex: 0 0 54px;
+  width: 54px;
+}
+
+.cycle-control :deep(.el-switch__core) {
+  width: 54px;
+}
+
+.day-select {
+  width: 104px;
+}
+
+.range-sep {
+  font-size: 11px;
+  color: #9aa0ad;
+}
+
+.range-actual {
+  font-size: 11px;
+  color: #9aa0ad;
+  font-variant-numeric: tabular-nums;
+}
+
+.income-mode :deep(.el-radio-button__inner) {
+  height: 24px;
+  padding: 0 10px;
+  line-height: 22px;
+  font-size: 11px;
 }
 
 .budget-title {

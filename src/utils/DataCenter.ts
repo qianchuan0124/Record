@@ -6,6 +6,7 @@ import { CategorySettingNode } from "@/models/CategorySettingNode"
 import { CategoryNodeItem } from '@/models/CategoryNodeItem'
 import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from '@/models/Payroll'
 import { DepositBank, DepositData, DepositRecord } from '@/models/Deposit'
+import { BudgetSettings } from '@/models/Budget'
 
 export function logInfo(content: string) {
     window.electron.ipcRenderer.invoke('logger', 'info', ' [renderer] ' + content);
@@ -461,6 +462,36 @@ export async function fetchBudgetExpense(start: number, end: number): Promise<nu
     }
     catch (error: unknown) {
         logError("Fetching budget expense failed:" + error);
+        throw error;
+    }
+}
+
+export async function fetchBudgetSettings(): Promise<BudgetSettings | null> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.FETCH_BUDGET_SETTINGS);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as BudgetSettings | null;
+    }
+    catch (error: unknown) {
+        logError("Fetching budget settings failed:" + error);
+        throw error;
+    }
+}
+
+export async function saveBudgetSettings(settings: BudgetSettings): Promise<BudgetSettings> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.SAVE_BUDGET_SETTINGS, JSON.stringify(settings));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as BudgetSettings;
+    }
+    catch (error: unknown) {
+        logError("Saving budget settings failed:" + error);
         throw error;
     }
 }
