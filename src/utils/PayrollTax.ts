@@ -1,4 +1,4 @@
-import { SalaryRecord } from "@/models/Payroll";
+import { SalaryRecord, SalaryTaxMonthMode } from "@/models/Payroll";
 
 export interface SalaryTaxResult {
     tax: number;
@@ -10,6 +10,11 @@ export interface BonusTaxResult {
     tax: number;
     taxRate: number;
     netPay: number;
+}
+
+export interface SalaryTaxBase {
+    priorTaxable: number;
+    priorTax: number;
 }
 
 interface Bracket {
@@ -54,15 +59,29 @@ export function salaryIncomeOf(record: SalaryRecord): number {
     return round2(record.baseSalary + record.overtimePay + record.oneTimeBonus);
 }
 
-export function calcSalaryTax(
-    current: Pick<SalaryRecord, "id" | "date" | "baseSalary" | "overtimePay" | "oneTimeBonus" | "socialInsurance">,
-    sameYearSalaries: SalaryRecord[]
-): SalaryTaxResult {
-    const date = new Date(current.date);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
+function salaryTaxPeriod(timestamp: number, taxMonthMode: SalaryTaxMonthMode) {
+    const date = new Date(timestamp);
+    let year = date.getFullYear();
+    let month = date.getMonth() + 1;
+    // 工资日期是发薪日：默认按上月归属计算个税；1 月发薪归属上一年 12 月
+    if (taxMonthMode === "previous") {
+        month -= 1;
+        if (month === 0) {
+            month = 12;
+            year -= 1;
+        }
+    }
+    return { year, month };
+}
 
-    // 每月固定减除费用按当年 1 月至本月累计
+function salaryTaxParts(
+    current: Pick<SalaryRecord, "id" | "date" | "baseSalary" | "overtimePay" | "oneTimeBonus" | "socialInsurance">,
+    sameYearSalaries: SalaryRecord[],
+    taxMonthMode: SalaryTaxMonthMode
+) {
+    const currentPeriod = salaryTaxPeriod(current.date, taxMonthMode);
+    const year = currentPeriod.year;
+    const month = currentPeriod.month;
     const months = month;
 
     let priorIncome = 0;
@@ -72,21 +91,49 @@ export function calcSalaryTax(
         if (record.id === current.id) {
             continue;
         }
-        const recordDate = new Date(record.date);
-        if (recordDate.getFullYear() !== year || recordDate.getMonth() + 1 >= month) {
+        const recordPeriod = salaryTaxPeriod(record.date, taxMonthMode);
+        if (recordPeriod.year !== year || recordPeriod.month >= month) {
             continue;
         }
         priorIncome += salaryIncomeOf(record);
         priorInsurance += Number(record.socialInsurance) || 0;
         priorTax += Number(record.tax) || 0;
     }
+    return { year, month, months, priorIncome, priorInsurance, priorTax };
+}
 
+/** 自动计算的上月累计基数，用于手动累计输入框的默认值 */
+export function calcSalaryTaxBase(
+    current: Pick<SalaryRecord, "id" | "date" | "baseSalary" | "overtimePay" | "oneTimeBonus" | "socialInsurance">,
+    sameYearSalaries: SalaryRecord[],
+    taxMonthMode: SalaryTaxMonthMode = "current"
+): SalaryTaxBase {
+    const parts = salaryTaxParts(current, sameYearSalaries, taxMonthMode);
+    return {
+        priorTaxable: round2(Math.max(
+            0,
+            parts.priorIncome - parts.priorInsurance - MONTHLY_DEDUCTION * Math.max(0, parts.months - 1)
+        )),
+        priorTax: round2(parts.priorTax),
+    };
+}
+
+export function calcSalaryTax(
+    current: Pick<SalaryRecord, "id" | "date" | "baseSalary" | "overtimePay" | "oneTimeBonus" | "socialInsurance">,
+    sameYearSalaries: SalaryRecord[],
+    taxMonthMode: SalaryTaxMonthMode = "current",
+    manualBase: SalaryTaxBase | null = null
+): SalaryTaxResult {
+    const parts = salaryTaxParts(current, sameYearSalaries, taxMonthMode);
     const currentIncome = round2(current.baseSalary + current.overtimePay + current.oneTimeBonus);
     const currentInsurance = Number(current.socialInsurance) || 0;
-    const cumulativeTaxable = Math.max(
-        0,
-        priorIncome + currentIncome - priorInsurance - currentInsurance - MONTHLY_DEDUCTION * months
-    );
+    const cumulativeTaxable = manualBase
+        ? Math.max(0, manualBase.priorTaxable + currentIncome - currentInsurance - MONTHLY_DEDUCTION)
+        : Math.max(
+            0,
+            parts.priorIncome + currentIncome - parts.priorInsurance - currentInsurance - MONTHLY_DEDUCTION * parts.months
+        );
+    const priorTax = manualBase ? manualBase.priorTax : parts.priorTax;
 
     const bracket = findBracket(YEARLY_BRACKETS, cumulativeTaxable);
     const cumulativeTax = Math.max(0, cumulativeTaxable * bracket.rate - bracket.deduction);

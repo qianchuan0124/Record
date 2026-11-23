@@ -4,7 +4,7 @@ import { Record } from "@/models/Record";
 import { SingleYearlyData, TotalCategory, SingleCategoryData, YearlyData, TimeLineRecord, CategoryItem } from "@/models/AnalysisData"
 import { CategorySettingNode } from "@/models/CategorySettingNode"
 import { CategoryNodeItem } from '@/models/CategoryNodeItem'
-import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from '@/models/Payroll'
+import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem, PayrollSettings } from '@/models/Payroll'
 import { DepositBank, DepositData, DepositRecord } from '@/models/Deposit'
 import { BudgetSettings } from '@/models/Budget'
 
@@ -492,6 +492,36 @@ export async function saveBudgetSettings(settings: BudgetSettings): Promise<Budg
     }
     catch (error: unknown) {
         logError("Saving budget settings failed:" + error);
+        throw error;
+    }
+}
+
+export async function fetchPayrollSettings(): Promise<PayrollSettings> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.FETCH_PAYROLL_SETTINGS);
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as PayrollSettings;
+    }
+    catch (error: unknown) {
+        logError("Fetching payroll settings failed:" + error);
+        throw error;
+    }
+}
+
+export async function savePayrollSettings(settings: PayrollSettings): Promise<PayrollSettings> {
+    try {
+        const response = await window.electron.ipcRenderer.invoke(IpcType.SAVE_PAYROLL_SETTINGS, JSON.stringify(settings));
+        const data = JSON.parse(response) as IpcResponse;
+        if (data.type === "error") {
+            throw new Error(data.error);
+        }
+        return data.data as PayrollSettings;
+    }
+    catch (error: unknown) {
+        logError("Saving payroll settings failed:" + error);
         throw error;
     }
 }

@@ -289,5 +289,13 @@
   "income_current_month": "本月收入",
   "income_next_month": "下月收入",
   "next_month_income": "下月到手",
-  "period_expense": "账期已花"
+  "period_expense": "账期已花",
+  "tax_month_mode": "算税月份",
+  "tax_month_current": "本月",
+  "tax_month_previous": "上月",
+  "tax_month_tip": "累计减除费用和已缴税额按所选月份计算",
+  "manual_tax_base": "累计口径",
+  "manual_tax_base_tip": "按工资条/文档的累计数手动计算",
+  "prior_taxable": "上月累计所得",
+  "prior_paid_tax": "上月已缴税"
 }

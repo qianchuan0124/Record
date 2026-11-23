@@ -27,29 +27,51 @@ APP="dist_electron/mac-arm64/记账清单.app"
 # sqlite3 是 N-API 原生模块，绑定必须和 .app 架构一致，否则启动时报
 # "Cannot find module ... napi-v6-darwin-unknown-arm64/node_sqlite3.node"。
 # arm64 Node 下 npm install 会自带 arm64 绑定，这里只做兜底（依赖重装/缓存缺失时）。
+# 只检查架构不够：binding 被写坏时 Mach-O 头仍在，lipo 会说 arm64 正常，
+# 真正 dlopen 才报 __TEXT 段超出文件末尾。这里额外做一次加载校验。
+verify_sqlite_binding() {
+  node scripts/verify-sqlite-binding.js "$1" >/dev/null 2>&1
+}
+
 ensure_sqlite_binding() {
   local binding_root="node_modules/sqlite3/lib/binding"
   local dir="${binding_root}/napi-v6-darwin-unknown-arm64"
   local file="${dir}/node_sqlite3.node"
-  if [ -f "$file" ] && lipo -archs "$file" 2>/dev/null | grep -qw arm64; then
+  if verify_sqlite_binding "$file"; then
     return
   fi
 
-  local version name tmp
+  local version name tmp extracted
   version="$(node -p "require('./node_modules/sqlite3/package.json').version")"
   name="napi-v6-darwin-unknown-arm64.tar.gz"
   tmp="$(mktemp -d)"
-  echo "下载 sqlite3 arm64 预编译绑定（v${version}）..."
+  echo "sqlite3 arm64 绑定缺失或损坏，重新下载（v${version}）..."
   if ! curl -fsSL --retry 3 -o "${tmp}/${name}" \
     "https://cdn.npmmirror.com/binaries/sqlite3/v${version}/${name}"; then
     curl -fsSL --retry 3 -o "${tmp}/${name}" \
       "https://github.com/TryGhost/node-sqlite3/releases/download/v${version}/${name}"
   fi
-  rm -rf "$dir"
-  tar -xzf "${tmp}/${name}" -C "$binding_root"
+
+  # 先解压到临时目录校验，确认完整后再替换：避免下载中断时把本地原本可用的文件覆盖成半截
+  if ! tar -xzf "${tmp}/${name}" -C "$tmp" 2>/dev/null; then
+    rm -rf "$tmp"
+    echo "sqlite3 arm64 绑定下载包解压失败：${name}" >&2
+    exit 1
+  fi
+  extracted="${tmp}/napi-v6-darwin-unknown-arm64/node_sqlite3.node"
+  if ! verify_sqlite_binding "$extracted"; then
+    rm -rf "$tmp"
+    echo "sqlite3 arm64 绑定下载后不可用（文件不完整）：${extracted}" >&2
+    echo "请检查网络后重试，或手动解压 https://cdn.npmmirror.com/binaries/sqlite3/v${version}/${name} 到 ${binding_root}" >&2
+    exit 1
+  fi
+
+  mkdir -p "$dir"
+  cp "$extracted" "$file"
+  chmod +x "$file"
   rm -rf "$tmp"
 
-  if [ ! -f "$file" ] || ! lipo -archs "$file" 2>/dev/null | grep -qw arm64; then
+  if ! verify_sqlite_binding "$file"; then
     echo "sqlite3 arm64 绑定准备失败：$file" >&2
     exit 1
   fi
@@ -74,6 +96,18 @@ if ! lipo -archs "$APP/Contents/MacOS/记账清单" 2>/dev/null | grep -qw arm64
   exit 1
 fi
 echo "构建产物：${APP}（arm64）"
+
+# electron-builder 的 native rebuild 会重写 sqlite3 绑定，以最终打进用户机器的那份为准：
+# asarUnpack 后 .node 落在 app.asar.unpacked 里，截断文件在这一步才能被发现
+PACKAGED_BINDING="$APP/Contents/Resources/app.asar.unpacked/node_modules/sqlite3/lib/binding/napi-v6-darwin-unknown-arm64/node_sqlite3.node"
+if [ ! -f "$PACKAGED_BINDING" ]; then
+  echo "打包产物里找不到 sqlite3 绑定：$PACKAGED_BINDING" >&2
+  exit 1
+fi
+if ! node scripts/verify-sqlite-binding.js "$PACKAGED_BINDING"; then
+  echo "打包产物里的 sqlite3 绑定不可用，已中止打包：$PACKAGED_BINDING" >&2
+  exit 1
+fi
 
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"

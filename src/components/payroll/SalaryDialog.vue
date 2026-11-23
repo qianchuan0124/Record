@@ -17,6 +17,42 @@
           @change="markDirty" />
       </el-form-item>
 
+      <el-form-item :label="L10n.tax_month_mode">
+        <div class="tax-month-row">
+          <el-radio-group v-model="taxMonthMode" size="small" @change="onTaxMonthModeChanged">
+            <el-radio-button value="current">{{ L10n.tax_month_current }}</el-radio-button>
+            <el-radio-button value="previous">{{ L10n.tax_month_previous }}</el-radio-button>
+          </el-radio-group>
+          <span class="tax-month-tip">{{ L10n.tax_month_tip }}</span>
+        </div>
+      </el-form-item>
+
+      <el-form-item :label="L10n.manual_tax_base">
+        <div class="tax-month-row">
+          <el-switch v-model="manualBaseEnabled" size="small" @change="onManualBaseToggle" />
+          <span class="tax-month-tip">{{ L10n.manual_tax_base_tip }}</span>
+        </div>
+      </el-form-item>
+
+      <div v-if="manualBaseEnabled" class="form-grid">
+        <el-form-item :label="L10n.prior_taxable">
+          <el-input-number
+            v-model="manualPriorTaxable"
+            :min="0"
+            :precision="2"
+            :controls="false"
+            class="number-input" />
+        </el-form-item>
+        <el-form-item :label="L10n.prior_paid_tax">
+          <el-input-number
+            v-model="manualPriorTax"
+            :min="0"
+            :precision="2"
+            :controls="false"
+            class="number-input" />
+        </el-form-item>
+      </div>
+
       <div class="form-grid">
         <el-form-item :label="L10n.base_salary">
           <el-input-number
@@ -112,9 +148,9 @@
 import { computed, ref, watch, defineProps, defineEmits } from "vue";
 import { ElMessage } from "element-plus";
 import L10n from "@/configs/L10n.json";
-import { SalaryRecord } from "@/models/Payroll";
-import { calcSalaryTax, findPreviousMonthSalary } from "@/utils/PayrollTax";
-import { createSalary, updateSalary } from "@/utils/DataCenter";
+import { SalaryRecord, SalaryTaxMonthMode } from "@/models/Payroll";
+import { calcSalaryTax, calcSalaryTaxBase, findPreviousMonthSalary } from "@/utils/PayrollTax";
+import { createSalary, fetchPayrollSettings, savePayrollSettings, updateSalary } from "@/utils/DataCenter";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -142,6 +178,11 @@ const form = ref<SalaryRecord>({
 const saving = ref(false);
 const needsCalc = ref(true);
 const usePreviousDefaults = ref(false);
+const taxMonthMode = ref<SalaryTaxMonthMode>("current");
+const manualBaseEnabled = ref(false);
+const manualPriorTaxable = ref(0);
+const manualPriorTax = ref(0);
+let taxModeReady = false;
 
 function resetForm() {
   const today = new Date();
@@ -150,6 +191,9 @@ function resetForm() {
     form.value = { ...props.salary };
     needsCalc.value = false;
     usePreviousDefaults.value = false;
+    manualBaseEnabled.value = false;
+    manualPriorTaxable.value = 0;
+    manualPriorTax.value = 0;
     return;
   }
   const previous = findPreviousMonthSalary(props.salaries);
@@ -167,6 +211,49 @@ function resetForm() {
   };
   needsCalc.value = true;
   usePreviousDefaults.value = !!previous;
+  manualBaseEnabled.value = false;
+  manualPriorTaxable.value = 0;
+  manualPriorTax.value = 0;
+}
+
+async function loadTaxMonthMode() {
+  taxModeReady = false;
+  try {
+    const settings = await fetchPayrollSettings();
+    taxMonthMode.value = settings.salaryTaxMonthMode;
+  } catch (error) {
+    taxMonthMode.value = "current";
+  } finally {
+    taxModeReady = true;
+  }
+}
+
+async function onTaxMonthModeChanged() {
+  if (!taxModeReady) {
+    return;
+  }
+  try {
+    await savePayrollSettings({ salaryTaxMonthMode: taxMonthMode.value });
+  } catch (error) {
+    // 设置保存失败不影响本次计算
+  }
+  if (manualBaseEnabled.value) {
+    refreshManualBase();
+  }
+  calculate();
+}
+
+function refreshManualBase() {
+  const base = calcSalaryTaxBase(form.value, props.salaries, taxMonthMode.value);
+  manualPriorTaxable.value = base.priorTaxable;
+  manualPriorTax.value = base.priorTax;
+}
+
+function onManualBaseToggle(enabled: boolean | string | number) {
+  if (enabled === true) {
+    refreshManualBase();
+  }
+  calculate();
 }
 
 watch(
@@ -174,6 +261,7 @@ watch(
   (value) => {
     if (value) {
       resetForm();
+      void loadTaxMonthMode();
     }
   },
   { immediate: true }
@@ -209,11 +297,14 @@ function markManual() {
 }
 
 function calculate() {
-  const result = calcSalaryTax(form.value, props.salaries);
+  const manualBase = manualBaseEnabled.value
+    ? { priorTaxable: Number(manualPriorTaxable.value) || 0, priorTax: Number(manualPriorTax.value) || 0 }
+    : null;
+  const result = calcSalaryTax(form.value, props.salaries, taxMonthMode.value, manualBase);
   form.value.tax = result.tax;
   form.value.taxRate = result.taxRate;
   form.value.netPay = result.netPay;
-  form.value.taxManual = 0;
+  form.value.taxManual = manualBase ? 1 : 0;
   needsCalc.value = false;
 }
 
@@ -250,6 +341,18 @@ async function save() {
 <style scoped>
 .salary-form {
   padding-right: 8px;
+}
+
+.tax-month-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tax-month-tip {
+  font-size: 11px;
+  color: #9aa0ad;
 }
 
 .form-grid {

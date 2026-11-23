@@ -42,3 +42,9 @@ export interface PayrollIncome {
     salaryIncome: number;
     bonusIncome: number;
 }
+
+export type SalaryTaxMonthMode = "current" | "previous";
+
+export interface PayrollSettings {
+    salaryTaxMonthMode: SalaryTaxMonthMode;
+}

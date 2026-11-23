@@ -3,7 +3,7 @@ import path from "path";
 import { ipcMain } from "electron";
 import { app } from 'electron';
 import { Record } from "@/models/Record";
-import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem } from "@/models/Payroll";
+import { PayrollData, SalaryRecord, AnnualBonus, BudgetItem, PayrollSettings } from "@/models/Payroll";
 import { DepositBank, DepositData, DepositRecord } from "@/models/Deposit";
 import { BudgetSettings } from "@/models/Budget";
 import { presetByName } from "@/configs/BankPresets";
@@ -510,6 +510,25 @@ export function databaseListen() {
             return handleResult(await saveBudgetSettings(parsed));
         } catch (error: unknown) {
             logError("Saving budget settings failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.FETCH_PAYROLL_SETTINGS, async () => {
+        try {
+            return handleResult(await fetchPayrollSettings());
+        } catch (error: unknown) {
+            logError("Fetching payroll settings failed:" + error);
+            return handleError(error);
+        }
+    })
+
+    ipcMain.handle(IpcType.SAVE_PAYROLL_SETTINGS, async (event, settings) => {
+        try {
+            const parsed = typeof settings === "string" ? JSON.parse(settings) : settings;
+            return handleResult(await savePayrollSettings(parsed));
+        } catch (error: unknown) {
+            logError("Saving payroll settings failed:" + error);
             return handleError(error);
         }
     })
@@ -1607,6 +1626,7 @@ export async function fetchPayrollData(): Promise<PayrollData> {
 }
 
 async function recalculateSalaryYear(year: number): Promise<void> {
+    const payrollSettings = await fetchPayrollSettings();
     const start = new Date(year, 0, 1).getTime();
     const end = new Date(year, 11, 31, 23, 59, 59, 999).getTime();
     const rows = await dbAll(
@@ -1621,7 +1641,7 @@ async function recalculateSalaryYear(year: number): Promise<void> {
             prior.push(row);
             continue;
         }
-        const result = calcSalaryTax(row, prior);
+        const result = calcSalaryTax(row, prior, payrollSettings.salaryTaxMonthMode);
         if (round2(row.tax) !== result.tax || round2(row.taxRate) !== result.taxRate || round2(row.netPay) !== result.netPay) {
             row.tax = result.tax;
             row.taxRate = result.taxRate;
@@ -2087,6 +2107,9 @@ export async function importMobileBackupData(payload: any): Promise<MobileBackup
         if (payload && payload.budgetSettings) {
             await saveBudgetSettings(payload.budgetSettings);
         }
+        if (payload && payload.payrollSettings) {
+            await savePayrollSettings(payload.payrollSettings);
+        }
 
         await new Promise<void>((resolve, reject) => {
             db.run("COMMIT", (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve()));
@@ -2146,6 +2169,57 @@ export async function saveBudgetSettings(settings: BudgetSettings): Promise<Budg
             `INSERT INTO app_setting (key, value, syncId) VALUES ('budget', ?, 0)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value, syncId = syncId + 1`,
             [JSON.stringify(normalized)],
+            (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
+        );
+    });
+    return normalized;
+}
+
+const DEFAULT_PAYROLL_SETTINGS: PayrollSettings = {
+    salaryTaxMonthMode: "current",
+};
+
+function normalizePayrollSettings(input: any): PayrollSettings {
+    return {
+        salaryTaxMonthMode: input && input.salaryTaxMonthMode === "previous" ? "previous" : "current",
+    };
+}
+
+export async function fetchPayrollSettings(): Promise<PayrollSettings> {
+    const row = await dbGet(
+        "SELECT value FROM app_setting WHERE key = ?",
+        ["payroll"]
+    ) as { value: string } | undefined;
+    if (!row || !row.value) {
+        return { ...DEFAULT_PAYROLL_SETTINGS };
+    }
+    try {
+        return normalizePayrollSettings(JSON.parse(row.value));
+    } catch (error) {
+        return { ...DEFAULT_PAYROLL_SETTINGS };
+    }
+}
+
+export async function savePayrollSettings(settings: PayrollSettings): Promise<PayrollSettings> {
+    const normalized = normalizePayrollSettings(settings);
+    let existing: any = {};
+    const row = await dbGet(
+        "SELECT value FROM app_setting WHERE key = ?",
+        ["payroll"]
+    ) as { value: string } | undefined;
+    if (row && row.value) {
+        try {
+            existing = JSON.parse(row.value);
+        } catch (error) {
+            existing = {};
+        }
+    }
+    const value = { ...existing, ...normalized };
+    await new Promise<void>((resolve, reject) => {
+        db.run(
+            `INSERT INTO app_setting (key, value, syncId) VALUES ('payroll', ?, 0)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, syncId = syncId + 1`,
+            [JSON.stringify(value)],
             (err) => (err ? reject(new Error(ErrorType.DATA_BASE_ERROR)) : resolve())
         );
     });

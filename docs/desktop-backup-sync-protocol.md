@@ -75,7 +75,7 @@ record_yyyyMMdd_HHmmss_<deviceTag>_<mode>[_n].db
 | `budget_item` | 预算项 |
 | `deposit_bank` | 自定义银行目录（内置银行不落库） |
 | `deposit_record` | 存款记录，含本金、利率、利息、排序 |
-| `app_setting` | 本机业务设置，当前包含 `key = 'budget'` 的账期与收入口径 |
+| `app_setting` | 本机业务设置：`budget` 账期与收入口径、`payroll` 工资算税月份 |
 | `*.categories.json` | 自定义分类侧车 |
 
 内置银行名称和 logo 随安装包提供，不写入数据库、不参与同步。
@@ -119,7 +119,7 @@ record_yyyyMMdd_HHmmss_<deviceTag>_<mode>[_n].db
 - `budget_item`
 - `deposit_bank`
 - `deposit_record`
-- `app_setting`（含预算账期配置）
+- `app_setting`（含预算账期、工资算税月份配置；工资日期按发薪日，1 月发薪归属上一年 12 月）
 - `category-custom.json`（若存在）
 
 同步簿记（`cloud-sync.json` 的 `lastState`、`lastSnapshot`、时间戳等）不参与指纹。
@@ -200,8 +200,10 @@ record_yyyyMMdd_HHmmss_<deviceTag>_<mode>[_n].db
 | `bonuses[]` | `annual_bonus` |
 | `budgets[]` | `budget_item` |
 | `budgetSettings` | `app_setting` 中 `key = 'budget'` |
+| `payrollSettings` | `app_setting` 中 `key = 'payroll'`（算税月份） |
 
 - `budgetSettings` 缺失时保留本机当前账期配置，不重置为默认值。
+- `payrollSettings.salaryTaxMonthMode` 缺失时保留本机当前算税月份配置。
 - `deposit_bank` 不删除；恢复只重建存款记录，缺失的移动端银行名称会补建为自定义银行。
 - 移动端日期为 ISO 8601；桌面端统一取本地当天 00:00 存储，避免时区导致跨日。
 - 移动端 `typeRaw` 的 `expense` / `income` 映射为桌面端 `支出` / `收入`。

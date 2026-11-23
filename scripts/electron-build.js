@@ -27,7 +27,7 @@
  *   解法是先把目标标回 Medium 再打包：npm run fix:win-integrity（见 scripts/fix-win-integrity.ps1）。
  *   输出目录保持默认的 dist_electron（挪到工作区外没有意义：Low 的构建工具连目录都建不了）。
  */
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
@@ -53,6 +53,23 @@ console.log(
     `CSC_IDENTITY_AUTO_DISCOVERY=${env.CSC_IDENTITY_AUTO_DISCOVERY}`
 );
 console.log(`[electron-build] vue-cli-service electron:build ${extraArgs.join(" ")}`.trimEnd());
+
+// 打包前校验 sqlite3 原生绑定：只检查架构不够——下载/编译中断写出的半截文件
+// 头信息仍显示 arm64，只有真正 dlopen 时才失败，装到用户机器上会表现成
+// 主进程加载 Database 失败、所有 IPC 报「No handler registered」。
+if (process.platform === "darwin" && process.arch === "arm64") {
+  const verify = spawnSync(
+    process.execPath,
+    [path.join(root, "scripts", "verify-sqlite-binding.js")],
+    { cwd: root, encoding: "utf8" }
+  );
+  if (verify.status !== 0) {
+    console.error("[electron-build] sqlite3 arm64 原生绑定不可用，已中止打包：");
+    console.error((verify.stderr || verify.stdout || "").trim());
+    console.error("[electron-build] 修复：npm install 重装依赖，或运行 npm run dist:mac（会校验并自动补齐绑定）");
+    process.exit(1);
+  }
+}
 
 const child = spawn(process.execPath, [cli, "electron:build", ...extraArgs], {
   cwd: root,

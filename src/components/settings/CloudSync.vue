@@ -421,22 +421,16 @@ async function confirmSync() {
       if (!version.file) {
         throw new Error(L10n.mobile_backup_missing);
       }
-      const result = await importMobileBackup(version.file);
+      await importMobileBackup(version.file);
       syncVisible.value = false;
-      ElMessage.success({
-        message: `${L10n.mobile_import_success}：${L10n.record_count} ${result.records} · ${L10n.salary} ${result.salaries} · ${L10n.deposit} ${result.deposits} · ${L10n.local_backup_tip} ${result.local_backup}`,
-        duration: 6000,
-      });
+      ElMessage.success(L10n.mobile_import_success);
       notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
       updateCurrentCategory();
     } else {
       const result = await restoreCloudSnapshot(version.snapshot);
       syncVisible.value = false;
       logInfo("cloud restore done, local backup:" + result.local_backup);
-      ElMessage.success({
-        message: L10n.restore_success + ", " + L10n.local_backup_tip + " " + result.local_backup,
-        duration: 5000,
-      });
+      ElMessage.success(L10n.restore_success);
       notifyCenter.emit(NotifyType.IMPORT_DATA_SUCCESS);
       if (result.category_restored) {
         // 重新读取自定义分类，内容有变化时会广播 CATEGORY_DATA_UPDATE
